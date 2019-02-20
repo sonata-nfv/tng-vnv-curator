@@ -1,5 +1,3 @@
-# tng-vnv-curator
-5GTANGO V&amp;V Platform Curator component repository
 [![Build Status](http://jenkins.sonata-nfv.eu/buildStatus/icon?job=tng-vnv-curator/master)](https://jenkins.sonata-nfv.eu/job/tng-vnv-curator)
 
 
@@ -23,9 +21,9 @@ The Curator acts as the intermediate module between the Planner and the Executor
 ## Run the docker image
 
 ```bash
-[//]: # (docker pull registry.sonata-nfv.eu:5000/tng-vnv-curator)
-[//]: # (docker run -d --name tng-vnv-curator -p 6100:6100 registry.sonata-nfv.eu:5000/tng-vnv-curator)
 ```
+[comment]: # (docker pull registry.sonata-nfv.eu:5000/tng-vnv-curator)
+[comment]: # (docker run -d --name tng-vnv-curator -p 6100:6100 registry.sonata-nfv.eu:5000/tng-vnv-curator)
 
 ### Health checking
 
