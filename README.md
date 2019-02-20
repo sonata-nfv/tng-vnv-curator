@@ -52,6 +52,7 @@ The following lead developers are responsible for this repository and have admin
 
 * Juan Luis de la Cruz ([juanlucruz](https://github.com/juanlucruz))
 * Felipe Vicens ([felipevicens](https://github.com/felipevicens))
+* José Bonnet ([jbonnet](https://github.com/jbonnet)
 
 ## Feedback
 
