@@ -11,7 +11,7 @@ This is a [5GTANGO](http://www.5gtango.eu) component to coordinate the verificat
 
 ## What it is
 
-The Curator acts as the intermediate module between the Planner and the Executor for all V&V test activities. It is responsible for processing a Test Plan, preparing the SP environment for tests, triggering the execution and cleaning up the environment afterwards.
+The Curator acts as the intermediate module between the Planner and the Executor for all V&V tests activities. It is responsible for processing a Test Plan, preparing the SP environment for tests, triggering the execution and cleaning up the environment afterwards.
 
 
 
