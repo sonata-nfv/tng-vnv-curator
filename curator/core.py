@@ -32,9 +32,10 @@ from datetime import datetime
 from database import context
 from threading import Thread
 import uuid
+from interfaces import CatalogueClient, PlannerClient, PlatformAdapterClient, ExecutorClient
 from worker import Worker
+from helpers import process_test_plan, cancel_test_plan
 import time
-from helpers import *
 
 
 # def process_test_plan(test_plan):
@@ -49,6 +50,12 @@ app.app_context()
 
 API_ROOT = "api"
 API_VERSION = "v1"
+
+OK = 200
+CREATED = 201
+ACCEPTED = 202
+INTERNAL_ERROR = 500
+
 
 
 @app.route('/')
@@ -69,34 +76,46 @@ def list_routes():
         {
             'methods': ['GET'],
             'path': '/ping',
-            'description': ''
+            'description': 'Module sanity check'
+        },
+        {
+            'methods': ['GET'],
+            'path': '/'.join(['', API_ROOT, API_VERSION]),
+            'description': 'This api reference'
         },
         {
             'methods': ['POST'],
             'path':'/'.join(['', API_ROOT, API_VERSION, 'test-preparations']),
-            'description': ''
+            'description': 'Create a new test preparation'
         },
         {
             'methods': ['DELETE'],
             'path':'/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>']),
-            'description': ''
+            'description': 'Cancel a test preparation'
+        },
+        {
+            'methods': ['POST'],
+            'path': '/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_bundle_uuid>', 'sp-ready']),
+            'description': 'Callback for Platform Adapter to notify when a Network Service has been instantiated '
+                           'in OSM platform successfully'
         },
         {
             'methods': ['POST'],
             'path':'/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change']),
-            'description': ''
+            'description': 'Callback for Executor to notify running tests'
         },
         {
             'methods': ['POST'],
             'path':'/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change',
                              '<test_uuid>', 'finish']),
-            'description': ''
+            'description': 'Callback for Executor to notify when a test has finished successfully'
         },
         {
             'methods': ['POST'],
             'path':'/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change',
                              '<test_uuid>', 'cancel']),
-            'description': ''
+            'description': 'Callback for Executor to notify when a test has finished due '
+                           'to an error or has been cancelled'
         },
     ]
     return make_response(json.dumps(route_list), 200, {'Content-Type': 'application/json'})
@@ -105,29 +124,48 @@ def list_routes():
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations']), methods=['POST'])
 def handle_new_test_plan():
     new_uuid = str(uuid.uuid4())
-    process_thread = Thread(target=process_test_plan, args=(app, request.get_json(), new_uuid))
-    process_thread.start()
-    return make_response(new_uuid, 201)
+    try:
+        context['test_preparations'][new_uuid] = {'test_plan': request.get_json()}
+        process_thread = Thread(target=process_test_plan, args=(app, context['test_preparations'][new_uuid], new_uuid))
+        process_thread.start()
+        return make_response(new_uuid, CREATED)
+    except Exception as e:
+        return make_response(e, INTERNAL_ERROR)
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>']), methods=['DELETE'])
 def test_plan_cancelled(test_bundle_uuid):
     process_thread = Thread(target=cancel_test_plan, args=(app, request.get_json(), test_bundle_uuid))
     process_thread.start()
-    return make_response('', 202)
+    return make_response('', ACCEPTED)
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_bundle_uuid>', 'sp-ready']), methods=['POST'])
 def prepare_environment_callback(test_bundle_uuid):
-
-    return make_response('', 200)
+    """
+    This callback is used by OSM to notify
+    :param test_bundle_uuid:
+    :return:
+    """
+    # Notify SP setup blocked thread
+    return make_response('', OK)
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change']),
            methods=['POST'])
 def test_in_execution(test_bundle_uuid):
-    new_uuid = str(uuid.uuid4())
-    return make_response(new_uuid, 200)
+    """
+    Executor->Curator
+    Test in execution: executor responses with the Test ID that can be used in a future test cancellation
+    { "test-id": <test_id> }(?)
+    :param test_bundle_uuid:
+    :return:
+    """
+    try:
+        context['test_preparations'][test_bundle_uuid]['test_instances_running'].append(request.get_json()['test_id'])
+        return make_response('', OK)
+    except:
+        return make_response('', INTERNAL_ERROR)
 
 
 @app.route('/'.join(
@@ -135,7 +173,7 @@ def test_in_execution(test_bundle_uuid):
     methods=['POST'])
 def test_finished(test_bundle_uuid, test_uuid):
     # Wrap up
-    return make_response(200)
+    return make_response('', OK)
 
 
 @app.route('/'.join(
@@ -143,11 +181,11 @@ def test_finished(test_bundle_uuid, test_uuid):
     methods=['POST'])
 def test_cancelled(test_bundle_uuid, test_uuid):
     # Wrap up, notify
-    return make_response('', 200)
+    return make_response('', OK)
 
 
 if __name__ == "__main__":
     context['alive_since'] = datetime.utcnow().replace(microsecond=0)
-    context['test-preparations'] = {}
+    context['test_preparations'] = {}
     context['host_port'] = 'tng-vnv-curator:6101'
     app.run(debug=True, port=context['host_port'].split(':')[1], threaded=True)
