@@ -23,8 +23,8 @@ The Curator acts as the intermediate module between the Planner and the Executor
 ## Run the docker image
 
 ```bash
-[//]: # (docker pull registry.sonata-nfv.eu:5000/tng-vnv-curator)
-[//]: # (docker run -d --name tng-vnv-curator -p 6100:6100 registry.sonata-nfv.eu:5000/tng-vnv-curator)
+docker pull registry.sonata-nfv.eu:5000/tng-vnv-curator
+docker run -d --name tng-vnv-curator -p 6101:6101 registry.sonata-nfv.eu:5000/tng-vnv-curator
 ```
 
 ### Health checking

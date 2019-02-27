@@ -117,6 +117,12 @@ def test_plan_cancelled(test_bundle_uuid):
     return make_response('', 202)
 
 
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_bundle_uuid>', 'sp-ready']), methods=['POST'])
+def prepare_environment_callback(test_bundle_uuid):
+
+    return make_response('', 200)
+
+
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change']),
            methods=['POST'])
 def test_in_execution(test_bundle_uuid):
@@ -143,4 +149,5 @@ def test_cancelled(test_bundle_uuid, test_uuid):
 if __name__ == "__main__":
     context['alive_since'] = datetime.utcnow().replace(microsecond=0)
     context['test-preparations'] = {}
-    app.run(debug=True, port=6101, threaded=True)
+    context['host_port'] = 'tng-vnv-curator:6101'
+    app.run(debug=True, port=context['host_port'].split(':')[1], threaded=True)

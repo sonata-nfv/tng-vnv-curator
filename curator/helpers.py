@@ -67,6 +67,10 @@ def cancel_test_plan(app, test_plan_uuid):
 def generate_test_descriptor_instance(test_plan, parameters):
     #  Shake it and deliver
     test_descriptor_instance = {'new': 'test'}
+    # Add callbacks
+    test_descriptor_instance['callbacks'] = {
+        'finish': '/api/v1/test-preparations/<test_bundle_uuid>/change/<test_uuid>/finish'
+    }
     return test_descriptor_instance
 
 

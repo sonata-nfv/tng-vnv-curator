@@ -33,43 +33,27 @@ LABEL organization=5GTANGO
 # Configuration
 
 # Catalogue information
-ENV cat_path http://tng-cat:4011/api/catalogues/v2
-ENV vnfd_collection vnfs
-ENV nsd_collection network-services
-
-
-# Repository information
-ENV repo_path http://tng-rep:4012/
-#ENV repo_path http://tng-rep:4012/records
-ENV vnfr_collection vnfrs
-ENV nsr_collection nsrs
+ENV cat_base http://tng-cat:4011/
 
 # Platform Adapter
-ENV platform_adapter_path http://tng-vnv-platform-adapter:$port
+ENV platform_adapter_base http://tng-vnv-platform-adapter:$port/
 
-ENV planner_base http://tng-vnv-planner:$port
+ENV planner_base http://tng-vnv-planner:$port/
 
-ENV executor_base http://tng-vnv-executor:$port
+ENV executor_base http://tng-vnv-executor:$port/
 
-#
-
-# TODO: Database information
-# ENV Postgres
-
-# Install dependencies
+# Install dependencies (system level)
 RUN apt update && apt install -y glpk-utils python3-pip libffi-dev libssl-dev git
-
-RUN pip install git+git://github.com/eandersson/amqpstorm.git@feature/reuse_channels
 
 # add plugin related files
 WORKDIR /
-ADD README.md /tng-sp-ia-wtapi/
-ADD setup.py  /tng-sp-ia-wtapi/
+ADD README.md /tng-vnv-curator
+ADD setup.py  /tng-vnv-curator/
 
 # install actual plugin
-WORKDIR /tng-sp-ia-wtapi
+WORKDIR /tng-vnv-curator
 RUN python setup.py develop
 
-ADD .  /tng-sp-ia-wtapi
+ADD .  /tng-vnv-curator
 
-CMD ["tng-sp-ia-wtapi"]
+CMD ["tng-vnv-curator"]
