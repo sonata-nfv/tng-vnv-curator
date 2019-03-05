@@ -31,10 +31,10 @@ import logging
 from database import context
 
 
-def process_test_plan(app, test_plan, test_plan_uuid):
-    app.logger.debug('Processing ' + test_plan)
+def process_test_plan(app, test_bundle_uuid):
+    app.logger.debug('Processing ' + test_bundle_uuid)
     # test_plan contains NSD and TD
-    # Check platform
+    test_plan = context['test_preparations'][test_bundle_uuid]['test_plan']
     platforms = test_plan['service_platforms']  # should be a list
     if type(platforms) is not list:
         app.logger.error('Wrong platform value, should be a list and is a {}'.format(type(platforms)))
@@ -48,7 +48,7 @@ def process_test_plan(app, test_plan, test_plan_uuid):
                 onap_workflow()
             else:
                 raise NotImplementedError('Platform {} is not compatible')
-    context['test-preparations'][test_plan_uuid] = test_plan
+    context['test-preparations'][test_bundle_uuid] = test_plan
     params = {
         'destination': '1.2.3.4',
         'port': '123'
@@ -67,13 +67,15 @@ def cancel_test_plan(app, test_plan_uuid):
 def generate_test_descriptor_instance(test_plan, parameters):
     #  Shake it and deliver
     test_descriptor_instance = {'new': 'test'}
+    # Add callbacks
+    test_descriptor_instance['callbacks'] = {
+        'finish': '/api/v1/test-preparations/<test_bundle_uuid>/change/<test_uuid>/finish'
+    }
     return test_descriptor_instance
 
 
 def sonata_workflow():
 
-    def get_package():
-        pass
 
     def instantiate_nsd():
         pass
