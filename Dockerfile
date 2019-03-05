@@ -36,11 +36,11 @@ LABEL organization=5GTANGO
 ENV cat_base http://tng-cat:4011/
 
 # Platform Adapter
-ENV platform_adapter_base http://tng-vnv-platform-adapter:$port/
+ENV platform_adapter_base http://tng-vnv-platform-adapter:5001/
 
-ENV planner_base http://tng-vnv-planner:$port/
+ENV planner_base http://tng-vnv-planner:6100/
 
-ENV executor_base http://tng-vnv-executor:$port/
+ENV executor_base http://tng-vnv-executor:6300/
 
 # Install dependencies (system level)
 RUN apt update && apt install -y glpk-utils python3-pip libffi-dev libssl-dev git

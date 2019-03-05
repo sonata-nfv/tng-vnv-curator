@@ -27,8 +27,12 @@
 
 
 from flask import Flask, session, request, Response, json, url_for, make_response, g
+from flask_log_request_id import RequestID, current_request_id, RequestIDLogFilter
+import logging.config
+import logging
 import requests
 from datetime import datetime
+from time import strftime
 from database import context
 from threading import Thread
 import uuid
@@ -42,11 +46,16 @@ import time
 #     time.sleep(10)
 #     app.logger.debug('completed ' + test_plan)
 #     return 'completed'
-
-
 app = Flask(__name__)
-
 app.app_context()
+RequestID(app)
+
+# Setup logging
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s %(module)s.%(funcName)s [req_%(request_id)s] - %(message)s"))
+handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
+logging.getLogger().addHandler(handler)
+
 
 API_ROOT = "api"
 API_VERSION = "v1"
@@ -55,7 +64,6 @@ OK = 200
 CREATED = 201
 ACCEPTED = 202
 INTERNAL_ERROR = 500
-
 
 
 @app.route('/')
@@ -106,13 +114,13 @@ def list_routes():
         },
         {
             'methods': ['POST'],
-            'path':'/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change',
+            'path':'/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'tests',
                              '<test_uuid>', 'finish']),
             'description': 'Callback for Executor to notify when a test has finished successfully'
         },
         {
             'methods': ['POST'],
-            'path':'/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change',
+            'path':'/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'tests',
                              '<test_uuid>', 'cancel']),
             'description': 'Callback for Executor to notify when a test has finished due '
                            'to an error or has been cancelled'
@@ -121,7 +129,8 @@ def list_routes():
     return make_response(json.dumps(route_list), 200, {'Content-Type': 'application/json'})
 
 
-@app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations']), methods=['POST'])
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations']),
+           methods=['POST'])
 def handle_new_test_plan():
     new_uuid = str(uuid.uuid4())
     try:
@@ -133,14 +142,17 @@ def handle_new_test_plan():
         return make_response(e, INTERNAL_ERROR)
 
 
-@app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>']), methods=['DELETE'])
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>']),
+           methods=['DELETE'])
 def test_plan_cancelled(test_bundle_uuid):
+    app.logger.debug('Hello')
     process_thread = Thread(target=cancel_test_plan, args=(app, request.get_json(), test_bundle_uuid))
     process_thread.start()
     return make_response('', ACCEPTED)
 
 
-@app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_bundle_uuid>', 'sp-ready']), methods=['POST'])
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_bundle_uuid>', 'sp-ready']),
+           methods=['POST'])
 def prepare_environment_callback(test_bundle_uuid):
     """
     This callback is used by OSM to notify
@@ -169,7 +181,7 @@ def test_in_execution(test_bundle_uuid):
 
 
 @app.route('/'.join(
-    ['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change', '<test_uuid>', 'finish']),
+    ['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'tests', '<test_uuid>', 'finish']),
     methods=['POST'])
 def test_finished(test_bundle_uuid, test_uuid):
     # Wrap up
@@ -177,15 +189,50 @@ def test_finished(test_bundle_uuid, test_uuid):
 
 
 @app.route('/'.join(
-    ['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change', '<test_uuid>', 'cancel']),
+    ['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'tests', '<test_uuid>', 'cancel']),
     methods=['POST'])
 def test_cancelled(test_bundle_uuid, test_uuid):
     # Wrap up, notify
     return make_response('', OK)
 
 
-if __name__ == "__main__":
+#  Future
+# @app.route('/'.join(
+#     ['', API_ROOT, API_VERSION, 'test-management', 'probes', 'prune']),
+#     methods=['POST'])
+# def clean_probe_inventory():
+#     # Require login:password
+#     return make_response('', OK)
+
+
+#  Utils
+
+@app.errorhandler(404)
+def not_found(error):
+    return make_response(json.dumps({'code': '404 Not Found','message': error.description}),
+                         404, {'Content-Type': 'application/json'})
+
+
+@app.after_request
+def after_request(response):
+    app.logger.info('{} {} {} {} {} {}'.format(
+        request.remote_addr,
+        request.scheme,
+        request.method,
+        request.full_path,
+        response.status,
+        response.content_length
+    ))
+    response.headers.add('X-REQUEST-ID', current_request_id())
+    return response
+
+
+def main():
     context['alive_since'] = datetime.utcnow().replace(microsecond=0)
     context['test_preparations'] = {}
     context['host_port'] = 'tng-vnv-curator:6101'
     app.run(debug=True, port=context['host_port'].split(':')[1], threaded=True)
+
+
+if __name__ == "__main__":
+    main()
