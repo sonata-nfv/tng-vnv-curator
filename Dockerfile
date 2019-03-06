@@ -59,4 +59,5 @@ RUN python setup.py develop
 
 ADD .  /tng-vnv-curator
 
-CMD ["tng-vnv-curator"]
+#CMD ["tng-vnv-curator"]
+CMD ["python -c 'import flask'"]
