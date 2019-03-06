@@ -87,13 +87,15 @@ setup(
     # ],
     install_requires=[
         'docker',
-        'Flask',
+        'Flask                                                                                  ',
         'flask-log-request-id',
         'requests',
         'six',
         'urllib3',
     ],
     setup_requires=['pytest-runner'],
+    include_package_data=True,
+    zip_safe=False,
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
