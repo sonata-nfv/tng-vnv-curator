@@ -32,18 +32,13 @@ LABEL organization=5GTANGO
 
 # Configuration
 
-# Catalogue information
 ENV cat_base http://tng-cat:4011/
-
-# Platform Adapter
 ENV platform_adapter_base http://tng-vnv-platform-adapter:5001/
-
 ENV planner_base http://tng-vnv-planner:6100/
-
 ENV executor_base http://tng-vnv-executor:6300/
 
 # Install dependencies (system level)
-RUN apt update && apt install -y glpk-utils python3-pip libffi-dev libssl-dev git
+#RUN apt update && apt install -y glpk-utils python3-pip libffi-dev libssl-dev git
 RUN python -m pip install --upgrade pip setuptools wheel
 # RUN pip install requirements.txt
 
@@ -52,7 +47,7 @@ WORKDIR /
 ADD README.md /tng-vnv-curator/
 #ADD requirements.txt  /tng-vnv-curator/
 ADD setup.py  /tng-vnv-curator/
-VOLUME ["/var/run/docker.sock"]
+#VOLUME ["/var/run/docker.sock"]
 
 # install actual plugin
 WORKDIR /tng-vnv-curator
