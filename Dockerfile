@@ -52,6 +52,7 @@ WORKDIR /
 ADD README.md /tng-vnv-curator/
 #ADD requirements.txt  /tng-vnv-curator/
 ADD setup.py  /tng-vnv-curator/
+VOLUME ["/var/run/docker.sock"]
 
 # install actual plugin
 WORKDIR /tng-vnv-curator
