@@ -67,8 +67,35 @@ setup(
 
     packages=find_packages(),
     # TODO: review dependencies, add a requirements.txt from local venv freeze
-    install_requires=['amqpstorm', 'pytest', 'PyYAML', 'requests', 'pycodestyle', 'coloredlogs'],
+    # install_requires=[
+    #     'certifi>=2018.11.29',
+    #     'chardet>=3.0.4',
+    #     'Click>=7.0',
+    #     'docker>=3.7.0',
+    #     'docker-pycreds>=0.4.0',
+    #     'Flask>=1.0.2',
+    #     'Flask-Log-Request-ID>=0.10.0',
+    #     'idna>=2.8',
+    #     'itsdangerous>=1.1.0',
+    #     'Jinja2>=2.10',
+    #     'MarkupSafe>=1.1.1',
+    #     'requests>=2.21.0',
+    #     'six>=1.12.0',
+    #     'urllib3>=1.24.1',
+    #     'websocket-client>=0.55.0',
+    #     'Werkzeug>=0.14.1'
+    # ],
+    install_requires=[
+        'docker>=3.7.0',
+        'Flask>=1.0.0',
+        'flask-log-request-id',
+        'requests',
+        'six',
+        'urllib3',
+    ],
     setup_requires=['pytest-runner'],
+    include_package_data=True,
+    zip_safe=False,
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
