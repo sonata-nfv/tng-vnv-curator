@@ -47,8 +47,8 @@ RUN apt update && apt install -y glpk-utils python3-pip libffi-dev libssl-dev gi
 
 # add plugin related files
 WORKDIR /
-ADD README.md /tng-vnv-curator
-ADD setup.py  /tng-vnv-curator/
+ADD README.md /tng-vnv-curator/README.md
+ADD setup.py  /tng-vnv-curator/setup.py
 
 # install actual plugin
 WORKDIR /tng-vnv-curator
