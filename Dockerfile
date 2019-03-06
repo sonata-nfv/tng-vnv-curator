@@ -44,7 +44,7 @@ ENV executor_base http://tng-vnv-executor:6300/
 
 # Install dependencies (system level)
 RUN apt update && apt install -y glpk-utils python3-pip libffi-dev libssl-dev git
-#RUN python -m pip install --upgrade pip setuptools wheel
+RUN python -m pip install --upgrade pip setuptools wheel
 # RUN pip install requirements.txt
 
 # add plugin related files

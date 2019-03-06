@@ -86,7 +86,7 @@ setup(
     #     'Werkzeug>=0.14.1'
     # ],
     install_requires=[
-        'docker',
+        'docker>=3.7.0',
         'Flask>=1.0.0',
         'flask-log-request-id',
         'requests',
