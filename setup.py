@@ -67,7 +67,8 @@ setup(
 
     packages=find_packages(),
     # TODO: review dependencies, add a requirements.txt from local venv freeze
-    install_requires=['amqpstorm', 'pytest', 'PyYAML', 'requests', 'pycodestyle', 'coloredlogs'],
+    # install_requires=['amqpstorm', 'pytest', 'PyYAML', 'requests', 'pycodestyle', 'coloredlogs', 'flask'],
+    install_requires=requirements,
     setup_requires=['pytest-runner'],
 
     # To provide executable scripts, use entry points in preference to the

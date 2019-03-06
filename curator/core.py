@@ -36,7 +36,7 @@ from time import strftime
 from database import context
 from threading import Thread
 import uuid
-from interfaces import CatalogueClient, PlannerClient, PlatformAdapterClient, ExecutorClient
+# from interfaces import CatalogueClient, PlannerClient, PlatformAdapterClient, ExecutorClient
 from worker import Worker
 from helpers import process_test_plan, cancel_test_plan
 import time
@@ -230,7 +230,7 @@ def after_request(response):
 def main():
     context['alive_since'] = datetime.utcnow().replace(microsecond=0)
     context['test_preparations'] = {}
-    context['host_port'] = 'tng-vnv-curator:6101'
+    context['host_port'] = 'tng-vnv-curator:6200'
     app.run(debug=True, port=context['host_port'].split(':')[1], threaded=True)
 
 
