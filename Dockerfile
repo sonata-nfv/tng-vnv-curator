@@ -44,18 +44,18 @@ ENV executor_base http://tng-vnv-executor:6300/
 
 # Install dependencies (system level)
 RUN apt update && apt install -y glpk-utils python3-pip libffi-dev libssl-dev git
-RUN python -m pip install --upgrade pip setuptools wheel
+#RUN python -m pip install --upgrade pip setuptools wheel
 # RUN pip install requirements.txt
 
 # add plugin related files
 WORKDIR /
 ADD README.md /tng-vnv-curator/
 ADD requirements.txt  /tng-vnv-curator/
-ADD setup.py  /tng-vnv-curator/
+#ADD setup.py  /tng-vnv-curator/
 
 # install actual plugin
 WORKDIR /tng-vnv-curator
-RUN python setup.py develop
+#RUN python setup.py develop
 
 ADD .  /tng-vnv-curator
 
