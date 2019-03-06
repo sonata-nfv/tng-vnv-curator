@@ -230,8 +230,8 @@ def after_request(response):
 def main():
     context['alive_since'] = datetime.utcnow().replace(microsecond=0)
     context['test_preparations'] = {}
-    context['host_port'] = 'tng-vnv-curator:6200'
-    app.run(debug=True, port=context['host_port'].split(':')[1], threaded=True)
+    context['host'] = 'tng-vnv-curator:6200'
+    app.run(debug=True, host='0.0.0.0', port=context['host'].split(':')[1], threaded=True)
 
 
 if __name__ == "__main__":
