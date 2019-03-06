@@ -79,7 +79,6 @@ setup(
         'itsdangerous==1.1.0',
         'Jinja2==2.10',
         'MarkupSafe==1.1.1',
-        'pkg-resources==0.0.0',
         'requests==2.21.0',
         'six==1.12.0',
         'urllib3==1.24.1',
