@@ -33,12 +33,12 @@ import logging
 import requests
 from datetime import datetime
 from time import strftime
-from database import context
+from curator.database import context
 from threading import Thread
 import uuid
-# from interfaces import CatalogueClient, PlannerClient, PlatformAdapterClient, ExecutorClient
-from worker import Worker
-from helpers import process_test_plan, cancel_test_plan
+# from curator.interfaces import CatalogueClient, PlannerClient, PlatformAdapterClient, ExecutorClient
+from curator.worker import Worker
+from curator.helpers import process_test_plan, cancel_test_plan
 import time
 
 

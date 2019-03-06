@@ -28,7 +28,7 @@
 import time
 import requests
 import logging
-from database import context
+from curator.database import context
 
 
 def process_test_plan(app, test_bundle_uuid):
@@ -39,6 +39,7 @@ def process_test_plan(app, test_bundle_uuid):
     if type(platforms) is not list:
         app.logger.error('Wrong platform value, should be a list and is a {}'.format(type(platforms)))
     else:
+    # Network service deployment
         for platform in platforms:
             if platform is 'sonata':
                 sonata_workflow()
@@ -48,12 +49,13 @@ def process_test_plan(app, test_bundle_uuid):
                 onap_workflow()
             else:
                 raise NotImplementedError('Platform {} is not compatible')
+    # Pull docker images
     context['test-preparations'][test_bundle_uuid] = test_plan
-    params = {
+    instantiation_params = {
         'destination': '1.2.3.4',
         'port': '123'
     }
-    test_descriptor_instance = generate_test_descriptor_instance(test_plan, params)
+    test_descriptor_instance = generate_test_descriptor_instance(test_plan, instantiation_params)
     url = 'http://tng-vnv-executor:6102/test-executions'
     response = requests.post(url,json=test_descriptor_instance)
     app.logger.debug('Response from executor: {}'.format(response))
@@ -69,7 +71,7 @@ def generate_test_descriptor_instance(test_plan, parameters):
     test_descriptor_instance = {'new': 'test'}
     # Add callbacks
     test_descriptor_instance['callbacks'] = {
-        'finish': '/api/v1/test-preparations/<test_bundle_uuid>/change/<test_uuid>/finish'
+        'finish': '/api/v1/test-preparations/<test_bundle_uuid>/tests/<test_uuid>/finish'
     }
     return test_descriptor_instance
 
@@ -77,15 +79,17 @@ def generate_test_descriptor_instance(test_plan, parameters):
 def sonata_workflow():
 
 
-    def instantiate_nsd():
+    def get_package():
         pass
-    pass
+
+    def instantiate_package():
+        pass
+
+
+
 
 
 def osm_workflow():
-
-    def get_package():
-        pass
 
     def instantiate_nsd():
         pass
