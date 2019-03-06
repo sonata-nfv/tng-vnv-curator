@@ -59,4 +59,8 @@ RUN python setup.py develop
 
 ADD .  /tng-vnv-curator
 
+#Expose for testing
+EXPOSE 6200
+
 CMD ["tng-vnv-curator"]
+
