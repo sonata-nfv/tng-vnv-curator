@@ -36,7 +36,9 @@ from time import strftime
 from curator.database import context
 from threading import Thread
 import uuid
-# from curator.interfaces import CatalogueClient, PlannerClient, PlatformAdapterClient, ExecutorClient
+from curator.interfaces.vnv_components_interface import PlannerInterface, ExecutorInterface, PlatformAdapterInterface
+from curator.interfaces.common_databases_interface import CatalogueInterface
+from curator.interfaces.docker_interface import DockerInterface
 from curator.worker import Worker
 from curator.helpers import process_test_plan, cancel_test_plan
 import time
@@ -52,7 +54,7 @@ RequestID(app)
 
 # Setup logging
 handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s %(module)s.%(funcName)s [req_%(request_id)s] - %(message)s"))
+handler.setFormatter(logging.Formatter("[%(asctime)s] %(name)s %(levelname)s %(module)s.%(funcName)s [req_%(request_id)s] - %(message)s"))
 handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
 logging.getLogger().addHandler(handler)
 
@@ -63,6 +65,7 @@ API_VERSION = "v1"
 OK = 200
 CREATED = 201
 ACCEPTED = 202
+BAD_REQUEST = 400
 INTERNAL_ERROR = 500
 
 
@@ -132,23 +135,32 @@ def list_routes():
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations']),
            methods=['POST'])
 def handle_new_test_plan():
-    new_uuid = str(uuid.uuid4())
+    new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
     try:
-        context['test_preparations'][new_uuid] = {'test_plan': request.get_json()}
-        process_thread = Thread(target=process_test_plan, args=(app, context['test_preparations'][new_uuid], new_uuid))
-        process_thread.start()
-        return make_response(new_uuid, CREATED)
+        payload = request.get_json()
+        required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
+        if all(key in payload.keys() for key in required_keys):
+            context['test_preparations'][new_uuid] = payload  # Should have
+            process_thread = Thread(target=process_test_plan, args=(new_uuid,))
+            process_thread.start()
+            return make_response({'test-plan-uuid': new_uuid, 'status': 'STARTING'}, CREATED, {'Content-Type': 'application/json'})
+        else:
+            return make_response(
+                json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
+                BAD_REQUEST,
+                {'Content-Type': 'application/json'}
+            )
     except Exception as e:
-        return make_response(e, INTERNAL_ERROR)
+        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>']),
            methods=['DELETE'])
 def test_plan_cancelled(test_bundle_uuid):
     app.logger.debug('Hello')
-    process_thread = Thread(target=cancel_test_plan, args=(app, request.get_json(), test_bundle_uuid))
+    process_thread = Thread(target=cancel_test_plan, args=(request.get_json(), test_bundle_uuid))
     process_thread.start()
-    return make_response('', ACCEPTED)
+    return make_response('{}', ACCEPTED, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_bundle_uuid>', 'sp-ready']),
@@ -160,7 +172,7 @@ def prepare_environment_callback(test_bundle_uuid):
     :return:
     """
     # Notify SP setup blocked thread
-    return make_response('', OK)
+    return make_response('{}', OK, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change']),
@@ -175,9 +187,9 @@ def test_in_execution(test_bundle_uuid):
     """
     try:
         context['test_preparations'][test_bundle_uuid]['test_instances_running'].append(request.get_json()['test_id'])
-        return make_response('', OK)
-    except:
-        return make_response('', INTERNAL_ERROR)
+        return make_response({}, OK, {'Content-Type': 'application/json'})
+    except Exception as e:
+        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(
@@ -185,7 +197,7 @@ def test_in_execution(test_bundle_uuid):
     methods=['POST'])
 def test_finished(test_bundle_uuid, test_uuid):
     # Wrap up
-    return make_response('', OK)
+    return make_response('{}', OK, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(
@@ -193,7 +205,7 @@ def test_finished(test_bundle_uuid, test_uuid):
     methods=['POST'])
 def test_cancelled(test_bundle_uuid, test_uuid):
     # Wrap up, notify
-    return make_response('', OK)
+    return make_response('{}', OK, {'Content-Type': 'application/json'})
 
 
 #  Future
@@ -231,6 +243,19 @@ def main():
     context['alive_since'] = datetime.utcnow().replace(microsecond=0)
     context['test_preparations'] = {}
     context['host'] = 'tng-vnv-curator:6200'
+    padapt_iface = PlatformAdapterInterface()
+    exec_iface = ExecutorInterface()
+    plan_iface = PlannerInterface()
+    cat_iface = CatalogueInterface()
+    docker_iface = DockerInterface()
+
+    context['plugins'] = {
+        'platform_adapter': padapt_iface,
+        'executor': exec_iface,
+        'planner': plan_iface,
+        'catalogue': cat_iface,
+        'docker': docker_iface
+    }
     app.run(debug=True, host='0.0.0.0', port=context['host'].split(':')[1], threaded=True)
 
 
