@@ -93,7 +93,7 @@ setup(
         'six',
         'urllib3',
         'psycopg2',
-        'shutil'
+        # 'shutil'
     ],
     setup_requires=['pytest-runner'],
     include_package_data=True,
