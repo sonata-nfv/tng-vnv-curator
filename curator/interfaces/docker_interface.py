@@ -59,10 +59,9 @@ class DockerInterface(Interface):
         If DOCKER_HOST is not set, the default local Docker socket will be tried.
         :return: client object
         """
-        # lets check if Docker ENV information is set and use local socket as fallback
         if os.environ.get("DOCKER_HOST") is None:
             os.environ["DOCKER_HOST"] = "unix://var/run/docker.sock"
-            # LOG.warning("ENV variable 'DOCKER_HOST' not set. Using {0} as fallback.".format(os.environ["DOCKER_HOST"]))
+            _LOG.warning(f"ENV variable 'DOCKER_HOST' not set; using {os.environ['DOCKER_HOST']} as fallback")
 
         # lets connect to the Docker instance specified in current ENV
         # cf.: http://docker-py.readthedocs.io/en/stable/machine/
@@ -87,12 +86,15 @@ class DockerInterface(Interface):
 
             return None
 
+    def prune(self):
+        pass
+
     def pull(self, image_name, retry_max=3):
 
         """
         Process of pulling a Docker image probe
         """
-        #repository pull
+        # repository pull
         image = None
         retry_count = 0
         while not image:
@@ -108,13 +110,10 @@ class DockerInterface(Interface):
             finally:
                 return image
 
+    def rm_image(self, image):
+        self.docker_manager.images.remove(image=image, force=True)
+
     def start(self, id, image, sm_type, uuid, p_key):
-
-        if 'broker_host' in os.environ:
-            broker_host = os.environ['broker_host']
-        else:
-            broker_host = 'amqp://guest:guest@broker:5672/%2F'
-
         if 'network_id' in os.environ:
             network_id = os.environ['network_id']
         else:
@@ -141,16 +140,15 @@ class DockerInterface(Interface):
             self.docker_manager.connect_container_to_network(container=container, net_id=network_id, aliases=[id])
             self.docker_manager.start(container=container.get('Id'))
         else:
-            _LOG.warning('Network ID: {0} Not Found!, deprecated Docker --link is used instead'.format(network_id))
+            _LOG.warning(f'Network ID: {network_id} Not Found!, deprecated Docker --link is used instead')
             self.docker_manager.start(container=container.get('Id'), links=[(broker['name'], broker['alias'])])
 
     def stop(self, ssm_name):
         self.docker_manager.kill(ssm_name)
 
-    def rm (self, id, image, uuid):
-
-        cn_name = "{0}{1}".format(id,uuid)
-        _LOG.info("{0} Logs: {1}".format(id, self.docker_manager.logs(container=cn_name)))
+    def rm(self, c_id, image, uuid):
+        cn_name = f"{c_id}{uuid}"
+        _LOG.info(f"{c_id} Logs: {self.docker_manager.logs(container=cn_name))}")
         self.docker_manager.stop(container=cn_name)
         self.docker_manager.remove_container(container=cn_name, force=True)
         self.docker_manager.remove_image(image= image, force=True)

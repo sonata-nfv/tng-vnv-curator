@@ -30,6 +30,8 @@ class Interface:
     """
     Interface Abstraction WIP
     """
-    def __init__(self):
-        self._base_url = ''
+    def __init__(self, own_api_root=None, own_api_version=None):
+        self.__base_url = ''
         self.ledger = []
+        self.own_api_root = own_api_root
+        self.own_api_version = own_api_version

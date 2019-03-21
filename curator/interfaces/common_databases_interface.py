@@ -144,7 +144,8 @@ class CatalogueInterface(Interface):
         :param vendor:
         :param name:
         :param version:
-        :return: {package_uuid, package_name}
+        :return: package{'uuid', 'vendor', 'name', 'version',
+                        'package_file_uuid', 'package_file_name'}
         """
         package_inventory = self.get_package_descriptor_inventory()
         filtered_packages = [
@@ -163,6 +164,9 @@ class CatalogueInterface(Interface):
             raise FileNotFoundError
         return {
             'uuid': filtered_packages[0]['uuid'],
+            'vendor': filtered_packages[0]['pd']['vendor'],
+            'name': filtered_packages[0]['pd']['name'],
+            'version': filtered_packages[0]['pd']['version'],
             'package_file_uuid': filtered_packages[0]['pd']['package_file_uuid'],
             'package_file_name': filtered_packages[0]['pd']['package_file_name']
         }

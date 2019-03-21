@@ -49,16 +49,16 @@ class PlannerInterface(Interface):
             }
         ]
     """
-    def __init__(self):
-        Interface.__init__(self)
-        self._base_url = os.getenv('platform_adapter_base')
-        self._running_test_plans = []
+    def __init__(self, cu_api_root, cu_api_version):
+        Interface.__init__(self, cu_api_root, cu_api_version)
+        self.__base_url = os.getenv('platform_adapter_base')
+        self.__running_test_plans = []
 
     def add_new_test_plan(self, test_plan_uuid):
-        self._running_test_plans.append(test_plan_uuid)
+        self.__running_test_plans.append(test_plan_uuid)
 
     def send_callback(self, suffix, payload):
-        url = self._base_url + suffix
+        url = self.__base_url + suffix
         resp = requests.post(url, json=payload)
         return resp
 
@@ -67,9 +67,11 @@ class PlatformAdapterInterface(Interface):
     """
     This is a Interface for Platform Adapter (PA)
     """
-    def __init__(self):
-        Interface.__init__(self)
+    def __init__(self, cu_api_root, cu_api_version):
+        Interface.__init__(self, cu_api_root, cu_api_version)
         self.base_url = os.getenv('platform_adapter_base')
+        self.running_instances = []
+        self.events = []
 
     def available_platforms(self):
         url = '/'.join([self.base_url, 'service_platforms'])
@@ -123,8 +125,6 @@ class PlatformAdapterInterface(Interface):
         _LOG.debug(f'Transfer complete, running {package_process_uuid}@SP_({service_platform})')
         return package_process_uuid
 
-
-
     def transfer_package_osm(self):
         """
         Understanding package as the bundle of nsd + related vnfds
@@ -155,8 +155,95 @@ class PlatformAdapterInterface(Interface):
             _LOG.error(e)
             raise e
 
-    def instantiate_service_sonata(self,service_platform, service_uuid, name):
+    def get_service_instantiations_inventory(self, service_platform):
         """
+        Returns a list of instantiated services
+        {
+           "id":"4537e905-5183-4d96-bb31-3860121e21df",
+           "created_at":"2019-03-20T20:31:57.564Z",
+           "updated_at":"2019-03-20T20:40:48.515Z",
+           "status":"READY",
+           "request_type":"CREATE_SERVICE",
+           "instance_uuid":"143f50a9-ea11-4292-bd25-c0d4cbdabe6f",
+           "ingresses":"[]",
+           "egresses":"[]",
+           "callback":"",
+           "blacklist":"[]",
+           "customer_uuid":null,
+           "sla_id":null,
+           "name":null,
+           "error":null,
+           "description":null,
+           "service":{
+              "uuid":"c8dfa216-c1bd-46da-ac8a-fa3fb444cc16",
+              "vendor":"eu.5gtango",
+              "name":"ns-squid-haproxy",
+              "version":"0.2"
+           }
+        }
+        :param service_platform:
+        :return:
+        """
+        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        headers = {"Content-type": "application/json"}
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 404:
+                raise FileNotFoundError
+        except Exception as e:
+            _LOG.error(e)
+            raise e
+
+    def get_service_instantiation(self, service_platform, service_uuid):
+        """
+        Returns a instantiated service
+        {
+           "id":"4537e905-5183-4d96-bb31-3860121e21df",
+           "created_at":"2019-03-20T20:31:57.564Z",
+           "updated_at":"2019-03-20T20:40:48.515Z",
+           "status":"READY",
+           "request_type":"CREATE_SERVICE",
+           "instance_uuid":"143f50a9-ea11-4292-bd25-c0d4cbdabe6f",
+           "ingresses":"[]",
+           "egresses":"[]",
+           "callback":"",
+           "blacklist":"[]",
+           "customer_uuid":null,
+           "sla_id":null,
+           "name":null,
+           "error":null,
+           "description":null,
+           "service":{
+              "uuid":"c8dfa216-c1bd-46da-ac8a-fa3fb444cc16",
+              "vendor":"eu.5gtango",
+              "name":"ns-squid-haproxy",
+              "version":"0.2"
+           }
+        }
+        :param service_platform:
+        :param service_uuid:
+        :return:
+        """
+        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations', service_uuid])
+        headers = {"Content-type": "application/json"}
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 404:
+                raise FileNotFoundError
+        except Exception as e:
+            _LOG.error(e)
+            raise e
+
+    def instantiate_service_sonata(self, service_platform, service_uuid,
+                                   name, test_plan_uuid, test_uuid):
+        """
+        **************************************************
+        ** DEPRECATED BY automated_instantiation_sonata **
+        **************************************************
         POST /tng-vnv-platform-mngr/adapters/<service_platform>/instantiations
             {
                 "service_uuid":"86970b5e-0064-457e-b145-22ff13e08f65"
@@ -166,12 +253,12 @@ class PlatformAdapterInterface(Interface):
 
         EXAMPLE GOOD RESP:
         {
-            "id":"4537e905-5183-4d96-bb31-3860121e21df",
+            "id":"4537e905-5183-4d96-bb31-3860121e21df", <- id in /adapters/qual-sp-bcn/instantiations/4537e905-5183-4d96-bb31-3860121e21df
             "created_at":"2019-03-20T20:31:57.564Z",
             "updated_at":"2019-03-20T20:31:57.564Z",
             "status":"NEW",
             "request_type":"CREATE_SERVICE",
-            "instance_uuid":null,
+            "instance_uuid":null, <- instance_uuid is nsr
             "ingresses":"[]",
             "egresses":"[]",
             "callback":"",
@@ -198,7 +285,9 @@ class PlatformAdapterInterface(Interface):
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
         data = {
             "service_uuid": service_uuid,
-            "name": name
+            "name": name,
+            "callback": '/'.join(['http:/', context['host'], self.own_api_root, self.own_api_version,
+                                  'test-preparations', test_plan_uuid, 'tests', test_uuid, 'sp-ready'])
         }
         try:
             response = requests.post(url, headers=headers, json=data)
@@ -210,7 +299,44 @@ class PlatformAdapterInterface(Interface):
             _LOG.error(e)
             raise e
 
-    def instantiate_service_osm(self, service_platform, nsd_name, ns_name, vim_account):
+    def automated_instantiation_sonata(self, service_platform,
+                                       package_name, package_vendor, package_version,
+                                       instance_name, test_plan_uuid):
+        """
+        Simpler version to instantiate a service, working for sonata
+        :param service_platform:
+        :param package_name:
+        :param package_vendor:
+        :param package_version:
+        :param instance_name:
+        :param callback:
+        :return: network_service
+        """
+        data = {
+            "name": package_name,
+            "vendor": package_vendor,
+            "version": package_version,
+            "service_platform": service_platform,
+            "instance_name": instance_name,
+            "callback": '/'.join([
+                'http:/', context['host'],
+                self.own_api_root, self.own_api_version,
+                'test-preparations', test_plan_uuid,
+                'service-instances', instance_name, 'sp-ready'])
+        }
+        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        headers = {"Content-type": "application/json"}
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200:  # and not response.json()['error']:
+                return response.json()
+            elif response.status_code == 404:
+                raise FileNotFoundError
+        except Exception as e:
+            _LOG.error(e)
+            raise e
+
+    def instantiate_service_osm(self, service_platform, nsd_name, ns_name, vim_account, instance_name):
         """
         POST tng-vnv-platform-mngr/adapters/<service_platform>/instantiations
         {
@@ -272,13 +398,38 @@ class ExecutorInterface(Interface):
     """
     This is a Interface class for V&V Executor
     """
-    def __init__(self):
-        Interface.__init__(self)
+    def __init__(self, cu_api_root, cu_api_version):
+        Interface.__init__(self, cu_api_root, cu_api_version)
         self.base_url = os.getenv('executor_base')
+        self.events = []
 
-    def execution_request(self,):
-        # Send Callbacks
+    def execution_request(self, tdi, test_plan_uuid):
+        # TODO: Specify content in the callbacks?
+        data = {
+            'tdi': tdi,
+            "callbacks": {
+                'ERROR': '/'.join(
+                    ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
+                     test_plan_uuid, 'tests','<test_uuid>', 'cancel']),
+                'RUNNING': '/'.join(
+                    ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
+                     test_plan_uuid, 'change']),
+                'COMPLETED': '/'.join(
+                    ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
+                     test_plan_uuid, 'tests', '<test_uuid>', 'finish']),
+            }
+        }
         url = '/'.join([self.base_url, 'test-executions'])
+        headers = {"Content-type": "application/json"}
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200:  # and not response.json()['error']:
+                return response.json()
+            elif response.status_code == 404:
+                raise FileNotFoundError
+        except Exception as e:
+            _LOG.error(e)
+            raise e
 
     def execution_cancel(self, test_uuid):
         # Send Callbacks
