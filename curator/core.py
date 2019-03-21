@@ -34,9 +34,11 @@ import requests
 from datetime import datetime
 from time import strftime
 from curator.database import context
-from threading import Thread
+from threading import Thread, Event
 import uuid
-# from curator.interfaces import CatalogueClient, PlannerClient, PlatformAdapterClient, ExecutorClient
+from curator.interfaces.vnv_components_interface import PlannerInterface, ExecutorInterface, PlatformAdapterInterface
+from curator.interfaces.common_databases_interface import CatalogueInterface
+from curator.interfaces.docker_interface import DockerInterface
 from curator.worker import Worker
 from curator.helpers import process_test_plan, cancel_test_plan
 import time
@@ -52,7 +54,8 @@ RequestID(app)
 
 # Setup logging
 handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s %(module)s.%(funcName)s [req_%(request_id)s] - %(message)s"))
+handler.setFormatter(logging.Formatter("[%(asctime)s] %(name)s %(levelname)s %(module)s.%(funcName)s "
+                                       "[req_%(request_id)s] - %(message)s"))
 handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
 logging.getLogger().addHandler(handler)
 
@@ -63,6 +66,8 @@ API_VERSION = "v1"
 OK = 200
 CREATED = 201
 ACCEPTED = 202
+BAD_REQUEST = 400
+NOT_FOUND = 404
 INTERNAL_ERROR = 500
 
 
@@ -92,9 +97,9 @@ def list_routes():
             'description': 'This api reference'
         },
         {
-            'methods': ['POST'],
+            'methods': ['GET', 'POST'],
             'path':'/'.join(['', API_ROOT, API_VERSION, 'test-preparations']),
-            'description': 'Create a new test preparation'
+            'description': 'Get current test plans or those running'
         },
         {
             'methods': ['DELETE'],
@@ -126,41 +131,83 @@ def list_routes():
                            'to an error or has been cancelled'
         },
     ]
-    return make_response(json.dumps(route_list), 200, {'Content-Type': 'application/json'})
+    return make_response(json.dumps(route_list), OK, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations']),
-           methods=['POST'])
+           methods=['GET','POST'])
 def handle_new_test_plan():
-    new_uuid = str(uuid.uuid4())
-    try:
-        context['test_preparations'][new_uuid] = {'test_plan': request.get_json()}
-        process_thread = Thread(target=process_test_plan, args=(app, context['test_preparations'][new_uuid], new_uuid))
-        process_thread.start()
-        return make_response(new_uuid, CREATED)
-    except Exception as e:
-        return make_response(e, INTERNAL_ERROR)
+    if request.method == 'GET':
+        return make_response()(
+            json.dumps(context['test_preparations']),
+            OK,
+            {'Content-Type': 'application/json'}
+        )
+    elif request.method == 'POST':
+        new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
+        try:
+            payload = request.get_json()
+            required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
+            if all(key in payload.keys() for key in required_keys):
+                context['test_preparations'][new_uuid] = payload  # Should have
+                process_thread = Thread(target=process_test_plan, args=(new_uuid,))
+                process_thread.start()
+                return make_response({'test-plan-uuid': new_uuid, 'status': 'STARTING'}, CREATED, {'Content-Type': 'application/json'})
+            else:
+                return make_response(
+                    json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
+                    BAD_REQUEST,
+                    {'Content-Type': 'application/json'}
+                )
+        except Exception as e:
+            return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>']),
            methods=['DELETE'])
 def test_plan_cancelled(test_bundle_uuid):
     app.logger.debug('Hello')
-    process_thread = Thread(target=cancel_test_plan, args=(app, request.get_json(), test_bundle_uuid))
+    process_thread = Thread(target=cancel_test_plan, args=(request.get_json(), test_bundle_uuid))
     process_thread.start()
-    return make_response('', ACCEPTED)
+    return make_response('{"error": null}', ACCEPTED, {'Content-Type': 'application/json'})
 
 
-@app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_bundle_uuid>', 'sp-ready']),
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_bundle_uuid>', 'service-instances',
+                     '<instance_name>','sp-ready']),
            methods=['POST'])
-def prepare_environment_callback(test_bundle_uuid):
+def prepare_environment_callback(test_bundle_uuid, instance_name):
     """
     This callback is used by OSM to notify
     :param test_bundle_uuid:
+    :param instance_name:
     :return:
     """
     # Notify SP setup blocked thread
-    return make_response('', OK)
+    try:
+        payload = request.get_json()
+        required_keys = {'ns_instance_uuid', 'functions'}
+        if all(key in payload.keys() for key in required_keys):
+            # FIXME: Check which entry contains the corresponding type of platform (with nsi_name)
+            # FIXME: or ask it in the callback
+            context['test_preparations'][test_bundle_uuid]['augmented_descriptors'].append(
+                {
+                    'nsi_uuid': payload['ns_instance_uuid'],
+                    'nsi_name': payload['instance_name'],
+                    'platform': payload['sonata'],
+                    'functions': payload['functions']
+                }
+            )
+            context['events'][instance_name].clear()  # Unlocks thread
+            return make_response('{"error": null}', OK,{'Content-Type': 'application/json'})
+        else:
+            # TODO abort test, reason nsi
+            return make_response(
+                json.dumps({'error': 'Keys {required_keys} required in payload'}),
+                BAD_REQUEST,
+                {'Content-Type': 'application/json'}
+            )
+    except Exception as e:
+        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'change']),
@@ -175,9 +222,9 @@ def test_in_execution(test_bundle_uuid):
     """
     try:
         context['test_preparations'][test_bundle_uuid]['test_instances_running'].append(request.get_json()['test_id'])
-        return make_response('', OK)
-    except:
-        return make_response('', INTERNAL_ERROR)
+        return make_response({}, OK, {'Content-Type': 'application/json'})
+    except Exception as e:
+        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(
@@ -185,7 +232,7 @@ def test_in_execution(test_bundle_uuid):
     methods=['POST'])
 def test_finished(test_bundle_uuid, test_uuid):
     # Wrap up
-    return make_response('', OK)
+    return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(
@@ -193,7 +240,7 @@ def test_finished(test_bundle_uuid, test_uuid):
     methods=['POST'])
 def test_cancelled(test_bundle_uuid, test_uuid):
     # Wrap up, notify
-    return make_response('', OK)
+    return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 
 #  Future
@@ -207,22 +254,16 @@ def test_cancelled(test_bundle_uuid, test_uuid):
 
 #  Utils
 
-@app.errorhandler(404)
+@app.errorhandler(NOT_FOUND)
 def not_found(error):
-    return make_response(json.dumps({'code': '404 Not Found','message': error.description}),
-                         404, {'Content-Type': 'application/json'})
+    return make_response(json.dumps({'code': '404 Not Found', 'message': error.description}),
+                         NOT_FOUND, {'Content-Type': 'application/json'})
 
 
 @app.after_request
 def after_request(response):
-    app.logger.info('{} {} {} {} {} {}'.format(
-        request.remote_addr,
-        request.scheme,
-        request.method,
-        request.full_path,
-        response.status,
-        response.content_length
-    ))
+    app.logger.info(f'{request.remote_addr} {request.scheme} {request.method}'
+                    f' {request.full_path} {response.status} {response.content_length}')
     response.headers.add('X-REQUEST-ID', current_request_id())
     return response
 
@@ -231,6 +272,19 @@ def main():
     context['alive_since'] = datetime.utcnow().replace(microsecond=0)
     context['test_preparations'] = {}
     context['host'] = 'tng-vnv-curator:6200'
+    padapt_iface = PlatformAdapterInterface(API_ROOT, API_VERSION)
+    exec_iface = ExecutorInterface(API_ROOT, API_VERSION)
+    plan_iface = PlannerInterface(API_ROOT, API_VERSION)
+    cat_iface = CatalogueInterface()
+    docker_iface = DockerInterface()
+    context['plugins'] = {
+        'platform_adapter': padapt_iface,
+        'executor': exec_iface,
+        'planner': plan_iface,
+        'catalogue': cat_iface,
+        'docker': docker_iface
+    }
+    context['events'] = {}
     app.run(debug=True, host='0.0.0.0', port=context['host'].split(':')[1], threaded=True)
 
 

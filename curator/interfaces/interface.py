@@ -26,37 +26,12 @@
 # partner consortium (www.5gtango.eu).
 
 
-FROM python:3.6-slim
-LABEL organization=5GTANGO
-
-
-# Configuration
-
-ENV cat_base http://tng-cat:4011/
-ENV platform_adapter_base http://tng-vnv-platform-adapter:5001/
-ENV planner_base http://tng-vnv-planner:6100/
-ENV executor_base http://tng-vnv-executor:6300/
-
-# Install dependencies (system level)
-#RUN apt update && apt install -y glpk-utils python3-pip libffi-dev libssl-dev git
-RUN python -m pip install --upgrade pip setuptools wheel
-# RUN pip install requirements.txt
-
-# add plugin related files
-WORKDIR /
-ADD README.md /tng-vnv-curator/
-#ADD requirements.txt  /tng-vnv-curator/
-ADD setup.py  /tng-vnv-curator/
-#VOLUME ["/var/run/docker.sock"]
-
-# install actual plugin
-WORKDIR /tng-vnv-curator
-RUN python setup.py develop
-
-ADD .  /tng-vnv-curator
-
-#Expose for testing
-EXPOSE 6200
-
-CMD ["tng-vnv-curator"]
-
+class Interface:
+    """
+    Interface Abstraction WIP
+    """
+    def __init__(self, own_api_root=None, own_api_version=None):
+        self.__base_url = ''
+        self.ledger = []
+        self.own_api_root = own_api_root
+        self.own_api_version = own_api_version
