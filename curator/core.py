@@ -193,7 +193,7 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
                 {
                     'nsi_uuid': payload['ns_instance_uuid'],
                     'nsi_name': payload['instance_name'],
-                    'platform': payload['sonata'],
+                    'platform': payload['platform'],
                     'functions': payload['functions']
                 }
             )

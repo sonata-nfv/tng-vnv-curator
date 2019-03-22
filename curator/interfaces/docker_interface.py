@@ -114,41 +114,43 @@ class DockerInterface(Interface):
         self.docker_manager.images.remove(image=image, force=True)
 
     def start(self, id, image, sm_type, uuid, p_key):
-        if 'network_id' in os.environ:
-            network_id = os.environ['network_id']
-        else:
-            network_id = 'sonata'
-
-        vh_name = '{0}-{1}'.format(sm_type,uuid)
-        broker_host = "{0}/{1}".format(self.sm_broker_host, vh_name)
-
-        cn_name = "{0}{1}".format(id,uuid)
-
-        container = self.docker_manager.create_container(image=image,
-                                                         detach=True,
-                                                         name=cn_name,
-                                                         environment={'broker_host':broker_host, 'sf_uuid':uuid, 'PRIVATE_KEY':p_key})
-        networks = self.docker_manager.networks()
-        net_found = False
-        for i in range(len(networks)):
-            if networks[i]['Name'] == network_id:
-                net_found = True
-                break
-
-        if (net_found):
-            _LOG.info('Docker network is used!')
-            self.docker_manager.connect_container_to_network(container=container, net_id=network_id, aliases=[id])
-            self.docker_manager.start(container=container.get('Id'))
-        else:
-            _LOG.warning(f'Network ID: {network_id} Not Found!, deprecated Docker --link is used instead')
-            self.docker_manager.start(container=container.get('Id'), links=[(broker['name'], broker['alias'])])
+        # if 'network_id' in os.environ:
+        #     network_id = os.environ['network_id']
+        # else:
+        #     network_id = 'sonata'
+        #
+        # vh_name = '{0}-{1}'.format(sm_type,uuid)
+        # broker_host = "{0}/{1}".format(self.sm_broker_host, vh_name)
+        #
+        # cn_name = "{0}{1}".format(id,uuid)
+        #
+        # container = self.docker_manager.create_container(
+        #     image=image,
+        #     detach=True,
+        #     name=cn_name,
+        #     environment={'broker_host':broker_host, 'sf_uuid':uuid, 'PRIVATE_KEY':p_key})
+        # networks = self.docker_manager.networks()
+        # net_found = False
+        # for i in range(len(networks)):
+        #     if networks[i]['Name'] == network_id:
+        #         net_found = True
+        #         break
+        #
+        # if (net_found):
+        #     _LOG.info('Docker network is used!')
+        #     self.docker_manager.connect_container_to_network(container=container, net_id=network_id, aliases=[id])
+        #     self.docker_manager.start(container=container.get('Id'))
+        # else:
+        #     _LOG.warning(f'Network ID: {network_id} Not Found!, deprecated Docker --link is used instead')
+        #     self.docker_manager.start(container=container.get('Id'), links=[(broker['name'], broker['alias'])])
+        pass
 
     def stop(self, ssm_name):
         self.docker_manager.kill(ssm_name)
 
     def rm(self, c_id, image, uuid):
         cn_name = f"{c_id}{uuid}"
-        _LOG.info(f"{c_id} Logs: {self.docker_manager.logs(container=cn_name))}")
+        _LOG.info(f"{c_id} Logs: {self.docker_manager.logs(container=cn_name)}")
         self.docker_manager.stop(container=cn_name)
         self.docker_manager.remove_container(container=cn_name, force=True)
-        self.docker_manager.remove_image(image= image, force=True)
+        self.docker_manager.remove_image(image=image, force=True)

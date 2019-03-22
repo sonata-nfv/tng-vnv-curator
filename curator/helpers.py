@@ -115,18 +115,22 @@ def process_test_plan(test_bundle_uuid, nsi_event):
                 # for vnfr_ref in nsr['network_functions']:
                 #   vnfr_rec.append(requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}).json())
                 context['events'][instance_name].wait()
-                instantiation_params = [augd['functions'] for augd in context['test_preparations'][test_bundle_uuid]['augmented_descriptors'] if augd['platform'] == platform_type.lower()][0]
+                instantiation_params = [
+                    augd['functions'] for augd in
+                    context['test_preparations'][test_bundle_uuid]['augmented_descriptors']
+                    if augd['platform'] == platform_type.lower()
+                ][0]
                 # TODO: parse parameters into TD
+                # HOW are the parameters
                 # platform_adapter.get_service_instantiation()
                 # instantiation_params = {
                 #     'destination': '1.2.3.4',
                 #     'port': '123'
                 # }
                 test_descriptor_instance = generate_test_descriptor_instance(td, instantiation_params)
-                executor.execution_request()
-                url = 'http://tng-vnv-executor:6102/test-executions'
+                ex_response = executor.execution_request(test_descriptor_instance, test_bundle_uuid)
 
-                _LOG.debug('Response from executor: {}'.format(response))
+                _LOG.debug(f'Response from executor: {ex_response}')
             elif platform_type == 'OSM':
                 # TODO
                 sp = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
@@ -143,6 +147,7 @@ def process_test_plan(test_bundle_uuid, nsi_event):
 
 def execute_test_plan():
     # TODO: execute tests inside test_plan
+    # For the moment we have only 1 test per test_plan
     pass
 
 

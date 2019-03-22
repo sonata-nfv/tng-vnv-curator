@@ -404,6 +404,12 @@ class ExecutorInterface(Interface):
         self.events = []
 
     def execution_request(self, tdi, test_plan_uuid):
+        """
+
+        :param tdi:
+        :param test_plan_uuid:
+        :return:
+        """
         # TODO: Specify content in the callbacks?
         data = {
             'tdi': tdi,
