@@ -57,9 +57,15 @@ class PlannerInterface(Interface):
     def add_new_test_plan(self, test_plan_uuid):
         self.__running_test_plans.append(test_plan_uuid)
 
-    def send_callback(self, suffix, payload):
+    def send_callback(self, suffix, test_plan_uuid, results_uuid):
         url = self.__base_url + suffix
-        resp = requests.post(url, json=payload)
+        payload = {
+            'test-plan-uuid': test_plan_uuid,
+            'results-uuid': results_uuid,
+            'status': 'COMPLETED',
+        }
+        headers = {"Content-type": "application/json"}
+        resp = requests.post(url, headers=headers, json=payload)
         return resp
 
 
@@ -351,8 +357,19 @@ class PlatformAdapterInterface(Interface):
         """
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
 
-    def shutdown_package(self, service_platform, package_uuid):
+    def shutdown_package(self, service_platform, instance_uuid):
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        data = {"instance_uuid": instance_uuid, "request_type": "TERMINATE_SERVICE"}
+        headers = {"Content-type": "application/json"}
+        try:
+            response = requests.delete(url, headers=headers, json=data)
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 404:
+                raise FileNotFoundError
+        except Exception as e:
+            _LOG.error(e)
+            raise e
 
     def upload_package(self, platform, package_file_uuid):
         """
@@ -416,7 +433,7 @@ class ExecutorInterface(Interface):
             "callbacks": {
                 'ERROR': '/'.join(
                     ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
-                     test_plan_uuid, 'tests','<test_uuid>', 'cancel']),
+                     test_plan_uuid, 'tests', '<test_uuid>', 'cancel']),
                 'RUNNING': '/'.join(
                     ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
                      test_plan_uuid, 'change']),

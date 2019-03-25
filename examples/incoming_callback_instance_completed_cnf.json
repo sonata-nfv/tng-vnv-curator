@@ -1,87 +1,23 @@
 {
-  "ns_instance_uuid":"7ca19e4c-a331-4f79-b9aa-a64e626bd0c6",
-  ":NEW:platform_type":"sonata",
+  "ns_instance_uuid":"e64904e7-c2fe-4ff9-a146-6f5f10f44595",
+  "platform_type":"sonata",
   "functions":[
     {
-      "vnfr_id":"dce23ef1-37e1-4241-8c6a-cccb1a010d34",
-      "endpoints": [
+      "name":"default-cnf0",
+      "function_type":"cnf",
+      "endpoints":[
         {
-
-        }
-      ],
-      "pods":[
-        {
-          "pod_name":"cdu01-dce23ef1-37e1-4241-8c6a-cccb1a010d34",
-          "endpoints":[
+          "id":"floating-ip",
+          "type":"floating-ip",
+          "address":"172.16.1.1",
+          "ports":[
             {
-              "id":"mqtt",
-              "port":"1883",
-              "type":"serviceendpoint"
+              "id":"http",
+              "port":80
             },
             {
-              "id":"prometheus",
-              "port":"9090",
-              "type":"serviceendpoint"
-            }
-          ]
-        },
-        {
-          "pod_name":"cdu02-dce23ef1-37e1-4241-8c6a-cccb1a010d34",
-          "endpoints":[
-            {
-              "id":"mqtt",
-              "port":"1883",
-              "type":"serviceendpoint"
-            },
-            {
-              "id":"prometheus",
-              "port":"9090",
-              "type":"serviceendpoint"
-            }
-          ]
-        },
-        {
-          "pod_name":"cdu03-dce23ef1-37e1-4241-8c6a-cccb1a010d34",
-          "endpoints":[
-            {
-              "id":"mqtt",
-              "port":"1883",
-              "type":"serviceendpoint"
-            },
-            {
-              "id":"prometheus",
-              "port":"9090",
-              "type":"serviceendpoint"
-            }
-          ]
-        },
-        {
-          "pod_name":"cdu04-dce23ef1-37e1-4241-8c6a-cccb1a010d34",
-          "endpoints":[
-            {
-              "id":"mqtt",
-              "port":"1883",
-              "type":"serviceendpoint"
-            },
-            {
-              "id":"prometheus",
-              "port":"9090",
-              "type":"serviceendpoint"
-            }
-          ]
-        },
-        {
-          "vnfr_id":"67951fe5-af9b-42b7-be13-21a827c8fcf0",
-          "pods":[
-            {
-              "pod_name":"cdu01-67951fe5-af9b-42b7-be13-21a827c8fcf0",
-              "endpoints":[
-                {
-                  "id":"grafana",
-                  "port":"3000",
-                  "type":"serviceendpoint"
-                }
-              ]
+              "id":"https",
+              "port":443
             }
           ]
         }

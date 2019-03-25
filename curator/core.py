@@ -40,7 +40,7 @@ from curator.interfaces.vnv_components_interface import PlannerInterface, Execut
 from curator.interfaces.common_databases_interface import CatalogueInterface
 from curator.interfaces.docker_interface import DockerInterface
 from curator.worker import Worker
-from curator.helpers import process_test_plan, cancel_test_plan
+from curator.helpers import process_test_plan, cancel_test_plan, clean_environment
 import time
 
 
@@ -185,15 +185,15 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
     # Notify SP setup blocked thread
     try:
         payload = request.get_json()
-        required_keys = {'ns_instance_uuid', 'functions'}
+        required_keys = {'ns_instance_uuid', 'functions', 'platform_type'}
         if all(key in payload.keys() for key in required_keys):
             # FIXME: Check which entry contains the corresponding type of platform (with nsi_name)
             # FIXME: or ask it in the callback
             context['test_preparations'][test_bundle_uuid]['augmented_descriptors'].append(
                 {
                     'nsi_uuid': payload['ns_instance_uuid'],
-                    'nsi_name': payload['instance_name'],
-                    'platform': payload['platform'],
+                    # 'nsi_name': payload['instance_name'],
+                    'platform': payload['platform_type'],
                     'functions': payload['functions']
                 }
             )
@@ -221,8 +221,8 @@ def test_in_execution(test_bundle_uuid):
     :return:
     """
     try:
-        context['test_preparations'][test_bundle_uuid]['test_instances_running'].append(request.get_json()['test_id'])
-        return make_response({}, OK, {'Content-Type': 'application/json'})
+        context['test_preparations'][test_bundle_uuid]['test_instances_running'].append(request.get_json()['test-uuid'])  # execution id
+        return make_response('{}', OK, {'Content-Type': 'application/json'})
     except Exception as e:
         return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
@@ -231,7 +231,7 @@ def test_in_execution(test_bundle_uuid):
     ['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'tests', '<test_uuid>', 'finish']),
     methods=['POST'])
 def test_finished(test_bundle_uuid, test_uuid):
-    # Wrap up
+    process_thread = Thread(target=clean_environment, args=(test_bundle_uuid, test_uuid, request.get_json(),))
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 

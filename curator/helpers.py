@@ -39,7 +39,7 @@ from time import sleep
 _LOG = logging.getLogger('flask.app')
 
 
-def process_test_plan(test_bundle_uuid, nsi_event):
+def process_test_plan(test_bundle_uuid):
     _LOG.info(f'Processing {test_bundle_uuid}')
     # test_plan contains NSD and TD
     td = context['test_preparations'][test_bundle_uuid]['test_descriptor']
@@ -116,20 +116,30 @@ def process_test_plan(test_bundle_uuid, nsi_event):
                 #   vnfr_rec.append(requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}).json())
                 context['events'][instance_name].wait()
                 instantiation_params = [
-                    augd['functions'] for augd in
-                    context['test_preparations'][test_bundle_uuid]['augmented_descriptors']
+                    (p_index, augd) for p_index, augd in
+                    enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
                     if augd['platform'] == platform_type.lower()
                 ][0]
-                # TODO: parse parameters into TD
-                # HOW are the parameters
-                # platform_adapter.get_service_instantiation()
-                # instantiation_params = {
-                #     'destination': '1.2.3.4',
-                #     'port': '123'
-                # }
-                test_descriptor_instance = generate_test_descriptor_instance(td, instantiation_params)
+                test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
+                nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
+                test_descriptor_instance = generate_test_descriptor_instance(
+                    td.copy(),
+                    instantiation_params[1]['functions'],
+                    test_uuid=test_cat['uuid'],
+                    service_uuid=nsd_cat['uuid'],
+                    package_uuid=package_info['uuid'],
+                    instance_uuid=instantiation_params[1]['nsi_uuid']
+                )
                 ex_response = executor.execution_request(test_descriptor_instance, test_bundle_uuid)
-
+                (context['test_preparations'][test_bundle_uuid]
+                    ['augmented_descriptors'][instantiation_params[0]]
+                    ['test_uuid']) = ex_response['test-uuid']
+                (context['test_preparations'][test_bundle_uuid]
+                    ['augmented_descriptors'][instantiation_params[0]]
+                    ['test_status']) = ex_response['status']
+                (context['test_preparations'][test_bundle_uuid]
+                    ['augmented_descriptors'][instantiation_params[0]]
+                    ['service_platform']) = service_platform
                 _LOG.debug(f'Response from executor: {ex_response}')
             elif platform_type == 'OSM':
                 # TODO
@@ -143,6 +153,20 @@ def process_test_plan(test_bundle_uuid, nsi_event):
     else:
         _LOG.error(f'Wrong platform value, should be a list and is a {type(platforms)}')
     # LOG.debug('completed ' + test_plan)
+
+
+def clean_environment(test_bundle_uuid, test_id, content):
+    platform_adapter = context['plugins']['platform_adapter']
+    planner = context['plugins']['planner']
+    callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
+    planner.send_callback(callback_path, test_bundle_uuid, content['results-uuid'])
+    test_finished = [
+        (p_index, augd) for p_index, augd in
+        enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
+        if augd['test_uuid'] == test_id
+    ][0]
+    platform_adapter.nsi_uuid(test_finished[1]['service_platform'], test_finished[1]['nsi_uuid'])
+
 
 
 def execute_test_plan():
@@ -163,15 +187,36 @@ def cancel_test_plan(test_plan_uuid, callback=None):
         raise ValueError('No callback')
 
 
-def generate_test_descriptor_instance(test_descriptor, parameters):
-    #  Shake it and deliver
-    test_descriptor_instance = {
-        'new': 'test',
-        'callbacks': {
-            'finish': '/api/v1/test-preparations/<test_bundle_uuid>/tests/<test_uuid>/finish'
-        }
-    }
-    return test_descriptor_instance
+def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
+                                      test_uuid=None, service_uuid=None,
+                                      package_uuid=None, instance_uuid=None):
+    """
+    This method searchs for parameters to be written with instantiation parameters and then writes them into the
+    augmented descriptor, and returns it
+    :param test_descriptor:
+    :param instantiation_parameters:
+    :param test_uuid:
+    :param service_uuid:
+    :param package_uuid:
+    :param instance_uuid:
+    :return:
+    """
+    configuration = [(i, conf_phase) for i, conf_phase in enumerate(test_descriptor['phases'])
+                     if conf_phase['name'] == 'configuration'][0]
+    for probe in configuration[1]['probes']:
+        if 'parameters' in probe.keys():
+            for i, probe_param in enumerate(probe['parameters']):
+                if probe_param['value'].startswith('$(') and probe_param['value'].endswith(')'):
+                    path = probe_param['value'].strip('$()').split('/')
+                    for parameter in instantiation_parameters:
+                        if parameter['name'] == path[0]:
+                            value = route_from_text(parameter, path[1:])
+                            test_descriptor['phases'][configuration[0]]['probes'][i]['value'] = value
+    test_descriptor['test_descriptor_uuid'] = test_uuid
+    test_descriptor['package_descriptor_uuid'] = package_uuid
+    test_descriptor['network_service_descriptor_uuid'] = service_uuid
+    test_descriptor['service_instance_uuid'] = instance_uuid
+    return test_descriptor
 
 
 def wait_for_instatiation(platform_adapter, service_platform, service_uuid, period=5, timeout=None):
@@ -189,4 +234,24 @@ def wait_for_instatiation(platform_adapter, service_platform, service_uuid, peri
         status = r['status']
         if status != 'READY':
             sleep(period)
+
+
+def route_from_text(obj, route):
+    """
+    Recursive function to look for the requested object
+    :param obj:
+    :param route:
+    :return:
+    """
+    if len(route) > 1 and ':' in route[0]:
+        res = [d for d in obj if d[route.split(':')[0]] == d[route.split(':')[1]]]
+        tail = route_from_text(res, route[1:])
+    elif len(route) > 1 and ':' not in route[0]:
+        res = obj[route[0]]
+        tail = route_from_text(res, route[1:])
+    elif len(route) == 1:
+        tail = obj[route[0]]
+    else:
+        raise ValueError
+    return tail
 
