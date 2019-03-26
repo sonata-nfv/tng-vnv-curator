@@ -138,7 +138,7 @@ def list_routes():
            methods=['GET','POST'])
 def handle_new_test_plan():
     if request.method == 'GET':
-        return make_response()(
+        return make_response(
             json.dumps(context['test_preparations']),
             OK,
             {'Content-Type': 'application/json'}
