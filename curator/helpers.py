@@ -45,6 +45,8 @@ def process_test_plan(test_bundle_uuid):
     td = context['test_preparations'][test_bundle_uuid]['test_descriptor']
     nsd = context['test_preparations'][test_bundle_uuid]['network_service_descriptor']
     context['test_preparations'][test_bundle_uuid]['augmented_descriptors'] = []
+    context['test_preparations'][test_bundle_uuid]['test_results'] = []
+    context['events'][test_bundle_uuid] = {}
     planner = context['plugins']['planner']
     dockeri = context['plugins']['docker']
     dockeri = dock_i.DockerInterface()
@@ -81,7 +83,7 @@ def process_test_plan(test_bundle_uuid):
                 _LOG.debug(f'Matching package found {package_info["uuid"]}, '
                            f'instantiating in {service_platform["name"]}')
                 instance_name = f"test-{td['name']}-{package_info['name']}-{service_platform}"
-                context['events'][instance_name] = threading.Event()
+                context['events'][test_bundle_uuid][instance_name] = threading.Event()
                 inst_result = platform_adapter.automated_instantiation_sonata(
                     service_platform['name'],
                     package_info['name'], package_info['vendor'], package_info['version'],
@@ -90,7 +92,7 @@ def process_test_plan(test_bundle_uuid):
                 )
                 if inst_result['error']:
                     raise Exception(inst_result['error'])
-                context['events'][instance_name].set()
+                context['events'][test_bundle_uuid][instance_name].set()
                 # ~LEGACY~
                 # sp_package_process_uuid = platform_adapter.transfer_package_sonata(
                 #     package_info, service_platform['name'])
@@ -114,7 +116,7 @@ def process_test_plan(test_bundle_uuid):
                 # nsr = requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}", headers=headers)
                 # for vnfr_ref in nsr['network_functions']:
                 #   vnfr_rec.append(requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}).json())
-                context['events'][instance_name].wait()
+                context['events'][test_bundle_uuid][instance_name].wait()
                 instantiation_params = [
                     (p_index, augd) for p_index, augd in
                     enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
@@ -140,7 +142,30 @@ def process_test_plan(test_bundle_uuid):
                 (context['test_preparations'][test_bundle_uuid]
                     ['augmented_descriptors'][instantiation_params[0]]
                     ['service_platform']) = service_platform
+                del context['events'][test_bundle_uuid][instance_name]
                 _LOG.debug(f'Response from executor: {ex_response}')
+                # # Wait for executor callback (?)
+                # context['events'][instance_name].set()
+                # context['events'][instance_name].wait()
+                # loop = True
+                # while loop:
+                #     if (context['test_preparations'][test_bundle_uuid]
+                #             ['augmented_descriptors'][instantiation_params[0]]
+                #             ['test_status']) == 'RUNNING':
+                #         pass  # do running thing
+                #     elif (context['test_preparations'][test_bundle_uuid]
+                #             ['augmented_descriptors'][instantiation_params[0]]
+                #             ['test_status']) == 'ERROR':
+                #         pass  # do running thing
+                #     elif (context['test_preparations'][test_bundle_uuid]
+                #             ['augmented_descriptors'][instantiation_params[0]]
+                #             ['test_status']) == 'COMPLETED':
+                #         pass  # do running thing
+                #     elif (context['test_preparations'][test_bundle_uuid]
+                #             ['augmented_descriptors'][instantiation_params[0]]
+                #             ['test_status']) == 'ERROR':
+                #         pass  # do running thing
+
             elif platform_type == 'OSM':
                 # TODO
                 sp = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
@@ -156,18 +181,38 @@ def process_test_plan(test_bundle_uuid):
 
 
 def clean_environment(test_bundle_uuid, test_id, content):
+    _LOG.info(f'Test {test_id} from test-plan {test_bundle_uuid} finished')
     platform_adapter = context['plugins']['platform_adapter']
+    dockeri = context['plugins']['docker']
     planner = context['plugins']['planner']
     callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
-    planner.send_callback(callback_path, test_bundle_uuid, content['results-uuid'])
+    context['test_preparations'][test_bundle_uuid]['test_results'].append(content)
     test_finished = [
         (p_index, augd) for p_index, augd in
         enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
         if augd['test_uuid'] == test_id
     ][0]
-    platform_adapter.nsi_uuid(test_finished[1]['service_platform'], test_finished[1]['nsi_uuid'])
+    (context['test_preparations'][test_bundle_uuid]['augmented_descriptors']
+        [test_finished[0]]['test_status']) = content['status']
+
+    #  Shutdown instance
+    pa_response = platform_adapter.nsi_uuid(test_finished[1]['service_platform'], test_finished[1]['nsi_uuid'])
+    if all([d['status'] != 'STARTING' and d['status'] != 'RUNNING'
+            for d in context['test_preparations'][test_bundle_uuid]['augmented_descriptors']]):
+        #  Remove probe images if there are no more instances running on this test plan
+        _LOG.debug(f'Test {test_id} was the last for test-plan {test_bundle_uuid}, '
+                   f'cleaning up and sending results to planner')
+        for probe in context['test_preparations'][test_bundle_uuid]['probes']:
+            dockeri.rm_image(probe['image'])
+        #  Answer to planner
+        planner_resp = planner.send_callback(callback_path, test_bundle_uuid,
+                                             context['test_preparations'][test_bundle_uuid]['test_results'])
+        # if planner_resp ok, clean test_preparations entry
+        del context['test_preparations'][test_bundle_uuid]
 
 
+def test_status_update(test_bundle_uuid, test_id, content):
+    pass
 
 
 def execute_test_plan():
@@ -176,16 +221,36 @@ def execute_test_plan():
     pass
 
 
-def cancel_test_plan(test_plan_uuid, callback=None):
+def cancel_test_plan(test_bundle_uuid, content):
+    """
+    Cancel all running tests on that test_bundle
+    and return response to planner
+    :param test_bundle_uuid:
+    :param content:
+    :return:
+    """
+    _LOG.info(f'Canceling test-plan {test_bundle_uuid} by planner request')
     planner = context['plugin']['planner']
     executor = context['plugin']['executor']
-    if callback:
-        planner.send_callback(callback) #, payload)
-        test_uuid_list = [test['uuid'] for test in context['test_plan_uuid']['tests'] if test['status'] == 'RUNNING']
-        for test_uuid in test_uuid_list:
-            executor.execution_cancel(test_uuid)
-    else:
-        raise ValueError('No callback')
+    dockeri = context['plugins']['docker']
+    callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
+    for test in [run_test for run_test in context['test_preparations'][test_bundle_uuid]['augmented_descriptors'] if run_test['status'] == 'RUNNING' or run_test['status'] == 'STARTING']:
+        context['events'][test_bundle_uuid][test['test_uuid']] = threading.Event()
+        context['events'][test_bundle_uuid][test['test_uuid']].set()
+        executor.execution_cancel(test_bundle_uuid, test['test_uuid'])
+        context['events'][test_bundle_uuid][test['test_uuid']].wait()
+
+    _LOG.debug(f'Finished cancelation for test-plan {test_bundle_uuid}, '
+               f'cleaning up and sending results to planner')
+    for probe in context['test_preparations'][test_bundle_uuid]['probes']:
+        dockeri.rm_image(probe['image'])
+        #  Answer to planner
+    planner_resp = planner.send_callback(callback_path, test_bundle_uuid,
+                                         context['test_preparations'][test_bundle_uuid]['test_results'])
+    # if planner_resp ok, clean test_preparations entry
+    del context['test_preparations'][test_bundle_uuid]
+
+
 
 
 def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,

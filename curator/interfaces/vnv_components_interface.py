@@ -429,18 +429,27 @@ class ExecutorInterface(Interface):
         """
         # TODO: Specify content in the callbacks?
         data = {
-            'tdi': tdi,
-            "callbacks": {
-                'ERROR': '/'.join(
-                    ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
-                     test_plan_uuid, 'tests', '<test_uuid>', 'cancel']),
-                'RUNNING': '/'.join(
-                    ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
-                     test_plan_uuid, 'change']),
-                'COMPLETED': '/'.join(
-                    ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
-                     test_plan_uuid, 'tests', '<test_uuid>', 'finish']),
-            }
+            'test': tdi,
+            "callbacks": [
+                {
+                    'name': 'running',
+                    'path': '/'.join(
+                        ['http:/', context['host'], self.own_api_root, self.own_api_version,
+                         'test-preparations', test_plan_uuid, 'change'])
+                },
+                {
+                    'name': 'cancel',
+                    'path': '/'.join(
+                        ['http:/', context['host'], self.own_api_root, self.own_api_version,
+                         'test-preparations', test_plan_uuid, 'tests', '<test_uuid>', 'cancel'])
+                },
+                {
+                    'name': 'finish',
+                    'path': '/'.join(
+                        ['http:/', context['host'], self.own_api_root, self.own_api_version,
+                         'test-preparations', test_plan_uuid, 'tests', '<test_uuid>', 'finish'])
+                }
+            ]
         }
         url = '/'.join([self.base_url, 'test-executions'])
         headers = {"Content-type": "application/json"}
@@ -454,8 +463,28 @@ class ExecutorInterface(Interface):
             _LOG.error(e)
             raise e
 
-    def execution_cancel(self, test_uuid):
-        # Send Callbacks
+    def execution_cancel(self, test_plan_uuid, test_uuid):
+        data = {
+            "callbacks": [
+                {
+                    'name': 'cancel',
+                    'path': '/'.join(
+                        ['http:/', context['host'], self.own_api_root, self.own_api_version,
+                         'test-preparations', test_plan_uuid, 'tests', '<test_uuid>', 'cancel'])
+                }
+            ]
+        }
         url = '/'.join([self.base_url, 'test-executions', test_uuid, 'cancel'])
-
+        headers = {"Content-type": "application/json"}
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200:  # and not response.json()['error']:
+                return response.json()
+            elif response.status_code == 404:
+                raise FileNotFoundError(404)
+            elif response.status_code == 500:
+                raise RuntimeError('Server error', response.content)
+        except Exception as e:
+            _LOG.error(e)
+            raise e
 

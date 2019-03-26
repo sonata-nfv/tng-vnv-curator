@@ -152,6 +152,7 @@ def handle_new_test_plan():
                 context['test_preparations'][new_uuid] = payload  # Should have
                 process_thread = Thread(target=process_test_plan, args=(new_uuid,))
                 process_thread.start()
+                context['threads'].append(process_thread)
                 return make_response({'test-plan-uuid': new_uuid, 'status': 'STARTING'}, CREATED, {'Content-Type': 'application/json'})
             else:
                 return make_response(
@@ -166,7 +167,7 @@ def handle_new_test_plan():
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>']),
            methods=['DELETE'])
 def test_plan_cancelled(test_bundle_uuid):
-    app.logger.debug('Hello')
+    app.logger.debug(f'Canceling test_plan ')
     process_thread = Thread(target=cancel_test_plan, args=(request.get_json(), test_bundle_uuid))
     process_thread.start()
     return make_response('{"error": null}', ACCEPTED, {'Content-Type': 'application/json'})
@@ -197,7 +198,7 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
                     'functions': payload['functions']
                 }
             )
-            context['events'][instance_name].clear()  # Unlocks thread
+            context['events'][test_bundle_uuid][instance_name].clear()  # Unlocks thread
             return make_response('{"error": null}', OK,{'Content-Type': 'application/json'})
         else:
             # TODO abort test, reason nsi
@@ -221,7 +222,13 @@ def test_in_execution(test_bundle_uuid):
     :return:
     """
     try:
-        context['test_preparations'][test_bundle_uuid]['test_instances_running'].append(request.get_json()['test-uuid'])  # execution id
+        executor_payload = request.get_json()
+        test_index = next(
+            (index for (index, d) in
+                enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
+                if d['test_uuid'] == executor_payload['test-uuid']), None)
+        (context['test_preparations'][test_bundle_uuid]['augmented_descriptors']
+            [test_index]['status']) = executor_payload['status']
         return make_response('{}', OK, {'Content-Type': 'application/json'})
     except Exception as e:
         return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
@@ -240,6 +247,9 @@ def test_finished(test_bundle_uuid, test_uuid):
     methods=['POST'])
 def test_cancelled(test_bundle_uuid, test_uuid):
     # Wrap up, notify
+    payload = request.get_json()
+    context['test_preparations'][test_bundle_uuid]['test_results'].append(payload)
+    context['events'][test_bundle_uuid][test_uuid].clear()
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 
@@ -285,6 +295,7 @@ def main():
         'docker': docker_iface
     }
     context['events'] = {}
+    context['threads'] = []
     app.run(debug=True, host='0.0.0.0', port=context['host'].split(':')[1], threaded=True)
 
 
