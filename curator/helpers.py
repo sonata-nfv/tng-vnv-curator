@@ -60,6 +60,7 @@ def process_test_plan(test_bundle_uuid):
     _LOG.debug(f'testd: {json.dumps(td)}')
     configuration_phase = [phase for phase in td['phases'] if phase['action'] == 'configure'].pop()
     for probe in configuration_phase['probes']:
+        _LOG.debug(f'Getting {probe["name"]}')
         image = dockeri.pull(probe['image'])
         context['test_preparations'][test_bundle_uuid]['probes'].append(
             {
@@ -68,6 +69,7 @@ def process_test_plan(test_bundle_uuid):
                 'image': probe['image']
             }
         )
+        _LOG.debug(f'Got {probe["name"]}, {image}')
     if type(platforms) is list:
 
         # Network service deployment, for each test

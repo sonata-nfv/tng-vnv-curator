@@ -83,7 +83,7 @@ class DockerInterface(Interface):
             image = self.docker_manager.images.get(image_name)
             return image
         except docker.errors.ImageNotFound as e:
-
+            _LOG.error(f'Image {image_name} has been not found')
             return None
 
     def prune(self):
