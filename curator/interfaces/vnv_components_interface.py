@@ -334,7 +334,7 @@ class PlatformAdapterInterface(Interface):
                 'service-instances', instance_name, 'sp-ready'])
         }
         _LOG.debug(f'Instantiation payload: {data}')
-        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        url = '/'.join([self.base_url, 'adapters', 'instantiate_service'])
         _LOG.debug(f'Accesing {url}')
         headers = {"Content-type": "application/json"}
         try:

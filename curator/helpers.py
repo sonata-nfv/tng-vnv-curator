@@ -84,9 +84,9 @@ def process_test_plan(test_bundle_uuid):
                 service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
                 # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
                 # the nsd, I am keeping this previous block
-                _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
-                package_info = vnv_cat.get_package_id_from_nsd_tuple(
-                    nsd['vendor'], nsd['name'], nsd['version'])
+                # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
+                # package_info = vnv_cat.get_package_id_from_nsd_tuple(
+                #     nsd['vendor'], nsd['name'], nsd['version'])
                 # _LOG.debug(f'Matching package found {package_info["uuid"]}, transfer to {service_platform["name"]}')
                 # _LOG.debug(f'Matching package found {package_info["uuid"]}, '
                 #            f'instantiating in {service_platform["name"]}')
@@ -139,7 +139,7 @@ def process_test_plan(test_bundle_uuid):
                     instantiation_params[1]['functions'],
                     test_uuid=test_cat['uuid'],
                     service_uuid=nsd_cat['uuid'],
-                    package_uuid=package_info['uuid'],
+                    package_uuid=inst_result['package_id'],
                     instance_uuid=instantiation_params[1]['nsi_uuid']
                 )
                 ex_response = executor.execution_request(test_descriptor_instance, test_bundle_uuid)
