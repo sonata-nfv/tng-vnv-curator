@@ -63,15 +63,17 @@ def process_test_plan(test_bundle_uuid):
     _LOG.debug(f'configuration_phase: {configuration_action}')
     for probe in configuration_action['probes']:
         _LOG.debug(f'Getting {probe["name"]}')
-        image = dockeri.pull(probe['image'])
+        # image = dockeri.pull(probe['image'])
+
         context['test_preparations'][test_bundle_uuid]['probes'].append(
             {
-                'id': image.short_id,
+                # 'id': image.short_id,
+                'id': 'aa-bb-cc-dd' + probe['name'],
                 'name': probe['name'],
                 'image': probe['image']
             }
         )
-        _LOG.debug(f'Got {probe["name"]}, {image}')
+        # _LOG.debug(f'Got {probe["name"]}, {image}')
     if type(platforms) is list:
 
         # Network service deployment, for each test
