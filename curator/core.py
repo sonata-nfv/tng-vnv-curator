@@ -289,8 +289,17 @@ def dummy_endpoint():
         app.logger.debug(f'args: {request.args}')
         return make_response('{"error": null}, {"message": "hello"}', OK, {'Content-Type': 'application/json'})
     elif request.method == 'POST':
-        app.logger.debug(f'args: {request.args}')
+        app.logger.debug(f'headers: {request.headers}')
         app.logger.debug(f'data:{request.get_data()}')
+        if request.headers['Content-type'] == 'application/json':
+            app.logger.debug(f'Content-type is json encoded! Content: {request.get_json()}')
+        else:
+            try:
+                app.logger.debug(f'Content-type is NOT json encoded but it is json compatible, '
+                                 f'Content: {json.loads(request.get_data().decode("UTF-8"))}')
+            except:
+                app.logger.debug(f'Data is not Json Serializable, Content: {request.get_data()}')
+
         return make_response(request.get_data(), OK, {'Content-type': request.headers['Content-type']})
 
 
