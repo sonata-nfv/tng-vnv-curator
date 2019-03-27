@@ -155,6 +155,7 @@ def process_test_plan(test_bundle_uuid):
                         package_uuid=inst_result['package_id'],
                         instance_uuid=instantiation_params[1]['nsi_uuid']
                     )
+                    _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
                     ex_response = executor.execution_request(test_descriptor_instance, test_bundle_uuid)
                     (context['test_preparations'][test_bundle_uuid]
                         ['augmented_descriptors'][instantiation_params[0]]
