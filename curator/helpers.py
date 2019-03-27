@@ -342,15 +342,19 @@ def route_from_text(obj, route):
     :param route:
     :return:
     """
+    _LOG.debug(f'Looking for {route} in {obj}')
     if len(route) > 1 and ':' in route[0]:
+        _LOG.debug('Is a dictionary nested inside a list')
         res = [d for d in obj if d[route.split(':')[0]] == d[route.split(':')[1]]]
         tail = route_from_text(res, route[1:])
     elif len(route) > 1 and ':' not in route[0]:
+        _LOG.debug('Is a dictionary nested inside a dictionary')
         res = obj[route[0]]
         tail = route_from_text(res, route[1:])
     elif len(route) == 1:
+        _LOG.debug('Is an object')
         tail = obj[route[0]]
     else:
-        raise ValueError
+        raise ValueError(obj, route)
     return tail
 
