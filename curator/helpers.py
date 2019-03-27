@@ -103,7 +103,8 @@ def process_test_plan(test_bundle_uuid):
                 if inst_result['error']:
                     raise Exception(inst_result['error'])
                 context['events'][test_bundle_uuid][instance_name].set()
-                _LOG.debug(f'After event is set {time.time()}')
+                _LOG.debug(f'After event is set {time.time()}, '
+                           f'E{context["events"][test_bundle_uuid][instance_name].is_set()}')
                 # ~LEGACY~
                 # sp_package_process_uuid = platform_adapter.transfer_package_sonata(
                 #     package_info, service_platform['name'])
@@ -127,9 +128,11 @@ def process_test_plan(test_bundle_uuid):
                 # nsr = requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}", headers=headers)
                 # for vnfr_ref in nsr['network_functions']:
                 #   vnfr_rec.append(requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}).json())
-                _LOG.debug(f'Waiting for event {test_bundle_uuid}.{instance_name}')
+                _LOG.debug(f'Waiting for event {test_bundle_uuid}.{instance_name}, '
+                           f'E{context["events"][test_bundle_uuid][instance_name].is_set()}')
                 context['events'][test_bundle_uuid][instance_name].wait()
-                _LOG.debug(f'After waiting for event {time.time()}')
+                _LOG.debug(f'After waiting for event {time.time()}, '
+                           f'E{context["events"][test_bundle_uuid][instance_name].is_set()}')
                 _LOG.debug(f"Received parameters from SP: "
                            f"{context['test_preparations'][test_bundle_uuid]['augmented_descriptors']}")
                 instantiation_params = [
