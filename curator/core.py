@@ -154,7 +154,7 @@ def handle_new_test_plan():
             process_thread = Thread(target=process_test_plan, args=(new_uuid,))
             process_thread.start()
             context['threads'].append(process_thread)
-            return make_response({'test-plan-uuid': new_uuid, 'status': 'STARTING'}, CREATED, {'Content-Type': 'application/json'})
+            return make_response(json.dumps({'test-plan-uuid': new_uuid, 'status': 'STARTING'}), CREATED, {'Content-Type': 'application/json'})
             # else:
             #     return make_response(
             #         json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
