@@ -51,7 +51,7 @@ class PlannerInterface(Interface):
     """
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
-        self.__base_url = os.getenv('platform_adapter_base')
+        self.__base_url = os.getenv('planner_base')
         self.__running_test_plans = []
 
     def add_new_test_plan(self, test_plan_uuid):
@@ -98,6 +98,7 @@ class PlatformAdapterInterface(Interface):
         try:
             _LOG.debug(f'Getting {url}')
             response = requests.get(url, headers=headers)
+            _LOG.debug(f'Response {response.json()}')
             if response.status_code == 200:
                 return list(filter(lambda x: x['type'] == sp_type, response.json()))
             elif response.status_code == 404:
