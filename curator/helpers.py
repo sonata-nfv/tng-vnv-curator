@@ -130,6 +130,7 @@ def process_test_plan(test_bundle_uuid):
                 #   vnfr_rec.append(requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}).json())
                 _LOG.debug(f'Waiting for event {test_bundle_uuid}.{instance_name}, '
                            f'E({context["events"][test_bundle_uuid][instance_name].is_set()})')
+                context["events"][test_bundle_uuid][instance_name].wait()
                 _LOG.debug(f'After waiting for event {time.time()}, '
                            f'E({context["events"][test_bundle_uuid][instance_name].is_set()})')
                 _LOG.debug(f"Received parameters from SP: "

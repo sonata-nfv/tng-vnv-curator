@@ -61,7 +61,7 @@ handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
 logging.getLogger().addHandler(handler)
 
 # _LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
-_LOG = logging.getLogger('flask.app')
+# _LOG = logging.getLogger('flask.app')
 
 API_ROOT = "api"
 API_VERSION = "v1"
@@ -150,8 +150,8 @@ def handle_new_test_plan():
         new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
         try:
             payload = request.get_json()
-            # app.logger.debug(f'Received JSON: {payload}')
-            _LOG.debug(f'Received JSON: {payload}')
+            app.logger.debug(f'Received JSON: {payload}')
+            # _LOG.debug(f'Received JSON: {payload}')
             # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
             # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
             context['test_preparations'][new_uuid] = payload  # Should have
@@ -172,8 +172,8 @@ def handle_new_test_plan():
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>']),
            methods=['DELETE'])
 def test_plan_cancelled(test_bundle_uuid):
-    # app.logger.debug(f'Canceling test_plan ')
-    _LOG.debug(f'Canceling test_plan ')
+    app.logger.debug(f'Canceling test_plan ')
+    # _LOG.debug(f'Canceling test_plan ')
     process_thread = Thread(target=cancel_test_plan, args=(request.get_json(), test_bundle_uuid))
     process_thread.start()
     return make_response('{"error": null}', ACCEPTED, {'Content-Type': 'application/json'})
@@ -192,7 +192,8 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
     # Notify SP setup blocked thread
     try:
         payload = request.get_json()
-        _LOG.debug(f'Callback received, contains {payload}')
+        # _LOG.debug(f'Callback received, contains {payload}')
+        app.logger.debug(f'Callback received, contains {payload}')
         required_keys = {'ns_instance_uuid', 'functions', 'platform_type'}
         if all(key in payload.keys() for key in required_keys):
             # FIXME: Check which entry contains the corresponding type of platform (with nsi_name)
@@ -279,8 +280,8 @@ def not_found(error):
 
 @app.after_request
 def after_request(response):
-    # app.logger.info(f'{request.remote_addr} {request.scheme} {request.method}'
-    _LOG.info(f'{request.remote_addr} {request.scheme} {request.method}'
+    app.logger.info(f'{request.remote_addr} {request.scheme} {request.method}'
+    # _LOG.info(f'{request.remote_addr} {request.scheme} {request.method}'
                     f' {request.full_path} {response.status} {response.content_length}')
     response.headers.add('X-REQUEST-ID', current_request_id())
     return response
