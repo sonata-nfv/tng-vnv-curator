@@ -96,6 +96,7 @@ class PlatformAdapterInterface(Interface):
         url = '/'.join([self.base_url, 'service_platforms'])
         headers = {"Content-type": "application/json"}
         try:
+            _LOG.debug(f'Getting {url}')
             response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 return list(filter(lambda x: x['type'] == sp_type, response.json()))
