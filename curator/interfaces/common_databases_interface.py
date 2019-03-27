@@ -67,9 +67,11 @@ class CatalogueInterface(Interface):
             '='.join(['name', name]),
             '='.join(['version', version]),
         ])
+        _LOG.debug(f'GET {url}{query}')
         headers = {"Content-type": "application/json"}
         try:
             response = requests.get(url + query, headers=headers)
+            _LOG.debug(f'RESP {response.raw}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
@@ -106,8 +108,10 @@ class CatalogueInterface(Interface):
             '='.join(['version', version]),
         ])
         headers = {"Content-type": "application/json"}
+        _LOG.debug(f'GET {url}{query}')
         try:
             response = requests.get(url + query, headers=headers)
+            _LOG.debug(f'RESP {response.raw}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:

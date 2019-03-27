@@ -285,6 +285,7 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
     :param instance_uuid:
     :return:
     """
+    _LOG.debug(f'Parsing instantiation parameters, {vars()}')
     configuration = [(i, conf_phase) for i, conf_phase in enumerate(test_descriptor['phases'])
                      if conf_phase['name'] == 'configuration'][0]
     for probe in configuration[1]['probes']:
@@ -300,6 +301,7 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
     test_descriptor['package_descriptor_uuid'] = package_uuid
     test_descriptor['network_service_descriptor_uuid'] = service_uuid
     test_descriptor['service_instance_uuid'] = instance_uuid
+    _LOG.debug(test_descriptor)
     return test_descriptor
 
 
