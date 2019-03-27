@@ -294,8 +294,13 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
     :return:
     """
     _LOG.debug(f'Parsing instantiation parameters, {vars()}')
-    configuration = [(i, conf_phase) for i, conf_phase in enumerate(test_descriptor['phases'])
-                     if conf_phase['name'] == 'configuration'][0]
+    configuration = [
+        [
+            (i, step) for i, step in enumerate(setup_phase['steps'])
+            if step['action'] == 'configure'
+        ]
+        for setup_phase in test_descriptor['phases'] if setup_phase['id'] == 'setup'
+    ][0][0]
     for probe in configuration[1]['probes']:
         if 'parameters' in probe.keys():
             for i, probe_param in enumerate(probe['parameters']):
