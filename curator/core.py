@@ -190,9 +190,11 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
     :return:
     """
     # Notify SP setup blocked thread
-    app.logger.debug(f'Callback received, contains {request.data}')
+    app.logger.debug(f'Callback received, contains {request.get_data()}, '
+                     f'Content-type: {request.headers["Content-type"]}')
     try:
-        payload = request.get_json()
+        # payload = request.get_json()
+        payload = json.loads(request.get_data().decode("UTF-8"))
         # _LOG.debug(f'Callback received, contains {payload}')
         app.logger.debug(f'Callback received, contains {payload}')
         required_keys = {'ns_instance_uuid', 'functions', 'platform_type'}
