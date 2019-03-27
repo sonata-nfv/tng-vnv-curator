@@ -35,3 +35,6 @@ class Interface:
         self.ledger = []
         self.own_api_root = own_api_root
         self.own_api_version = own_api_version
+
+    def __str__(self):
+        return(self.__class__)
