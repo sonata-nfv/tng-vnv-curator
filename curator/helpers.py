@@ -57,10 +57,11 @@ def process_test_plan(test_bundle_uuid):
     executor = context['plugins']['executor']
     vnv_cat = context['plugins']['catalogue']
     context['test_preparations'][test_bundle_uuid]['probes'] = []
-    _LOG.debug(f'testd: {json.dumps(td)}')
-    configuration_phase = [phase for phase in td['phases'] if phase['action'] == 'configure'].pop()
-    _LOG.debug(f'configuration_phase: {configuration_phase}')
-    for probe in configuration_phase['probes']:
+    _LOG.debug(f'testd: {td}')
+    setup_phase = [phase for phase in td['phases'] if phase ['id'] == 'setup'].pop()
+    configuration_action = [step for step in setup_phase if step['action'] == 'configure'].pop()
+    _LOG.debug(f'configuration_phase: {configuration_action}')
+    for probe in configuration_action['probes']:
         _LOG.debug(f'Getting {probe["name"]}')
         image = dockeri.pull(probe['image'])
         context['test_preparations'][test_bundle_uuid]['probes'].append(
