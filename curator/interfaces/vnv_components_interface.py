@@ -309,22 +309,22 @@ class PlatformAdapterInterface(Interface):
             raise e
 
     def automated_instantiation_sonata(self, service_platform,
-                                       package_name, package_vendor, package_version,
+                                       service_name, service_vendor, service_version,
                                        instance_name, test_plan_uuid):
         """
         Simpler version to instantiate a service, working for sonata
         :param service_platform:
-        :param package_name:
-        :param package_vendor:
-        :param package_version:
+        :param service_name:
+        :param service_vendor:
+        :param service_version:
         :param instance_name:
         :param callback:
         :return: network_service
         """
         data = {
-            "name": package_name,
-            "vendor": package_vendor,
-            "version": package_version,
+            "service_name": service_name,
+            "service_vendor": service_vendor,
+            "service_version": service_version,
             "service_platform": service_platform,
             "instance_name": instance_name,
             "callback": '/'.join([
@@ -343,7 +343,9 @@ class PlatformAdapterInterface(Interface):
             if response.status_code == 200:  # and not response.json()['error']:
                 return response.json()
             elif response.status_code == 404:
-                raise FileNotFoundError
+                raise FileNotFoundError(response.json)
+            else:
+                raise Exception(response.json())
         except Exception as e:
             _LOG.error(e)
             raise e

@@ -88,13 +88,15 @@ def process_test_plan(test_bundle_uuid):
                 package_info = vnv_cat.get_package_id_from_nsd_tuple(
                     nsd['vendor'], nsd['name'], nsd['version'])
                 # _LOG.debug(f'Matching package found {package_info["uuid"]}, transfer to {service_platform["name"]}')
-                _LOG.debug(f'Matching package found {package_info["uuid"]}, '
-                           f'instantiating in {service_platform["name"]}')
-                instance_name = f"{td['name']}-{package_info['name']}-{service_platform['name']}"
+                # _LOG.debug(f'Matching package found {package_info["uuid"]}, '
+                #            f'instantiating in {service_platform["name"]}')
+                _LOG.debug(f'Instantiating nsd {nsd["vendor"]}:{nsd["name"]}:{nsd["version"]}, '
+                           f'in {service_platform["name"]}')
+                instance_name = f"{td['name']}-{nsd['name']}-{service_platform['name']}"
                 context['events'][test_bundle_uuid][instance_name] = threading.Event()
                 inst_result = platform_adapter.automated_instantiation_sonata(
                     service_platform['name'],
-                    package_info['name'], package_info['vendor'], package_info['version'],
+                    nsd['name'], nsd['vendor'], nsd['version'],
                     instance_name=instance_name,
                     test_plan_uuid=test_bundle_uuid
                 )
