@@ -168,7 +168,8 @@ def process_test_plan(test_bundle_uuid):
                     del context['events'][test_bundle_uuid][instance_name]
                     _LOG.debug(f'Response from executor: {ex_response}')
                 except Exception as e:
-                    _LOG.error(f'Something happened... {e}')
+                    _LOG.exception(f'Something happened... {e}')
+
                 # # Wait for executor callback (?)
                 # context['events'][instance_name].set()
                 # context['events'][instance_name].wait()

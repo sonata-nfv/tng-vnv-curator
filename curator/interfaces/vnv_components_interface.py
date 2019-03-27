@@ -91,7 +91,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def available_platforms_by_type(self, sp_type):
@@ -106,7 +106,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def remote_download_package(self, package_id):
@@ -125,7 +125,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def transfer_package_sonata(self, package_info, service_platform):
@@ -162,7 +162,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_service_instantiations_inventory(self, service_platform):
@@ -203,7 +203,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_service_instantiation(self, service_platform, service_uuid):
@@ -245,7 +245,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def instantiate_service_sonata(self, service_platform, service_uuid,
@@ -306,7 +306,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def automated_instantiation_sonata(self, service_platform,
@@ -348,7 +348,7 @@ class PlatformAdapterInterface(Interface):
             else:
                 raise Exception(response.json())
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def instantiate_service_osm(self, service_platform, nsd_name, ns_name, vim_account, instance_name):
@@ -377,7 +377,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def upload_package(self, platform, package_file_uuid):
@@ -397,7 +397,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def delete_package(self, platform, package_uuid, name=None, vendor=None, version=None):
@@ -469,7 +469,7 @@ class ExecutorInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def execution_cancel(self, test_plan_uuid, test_uuid):
@@ -494,6 +494,6 @@ class ExecutorInterface(Interface):
             elif response.status_code == 500:
                 raise RuntimeError('Server error', response.content)
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 

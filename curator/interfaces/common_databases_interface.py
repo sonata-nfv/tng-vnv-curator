@@ -57,7 +57,7 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_network_descriptor_tuple(self, vendor, name, version):
@@ -77,7 +77,7 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_test_descriptor(self, test_uuid):
@@ -90,7 +90,7 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_test_descriptor_tuple(self, vendor, name, version):
@@ -117,7 +117,7 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_package_from_nsd_tuple(self, vendor, name, version):
@@ -188,7 +188,7 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_package_descriptor(self, package_uuid):
@@ -206,7 +206,7 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_tgo_package_binary(self, tgo_package_uuid, tgo_package_name):
@@ -229,5 +229,5 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
