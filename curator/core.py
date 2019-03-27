@@ -190,6 +190,7 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
     :return:
     """
     # Notify SP setup blocked thread
+    app.logger.debug(f'Callback received, contains {request.}')
     try:
         payload = request.get_json()
         # _LOG.debug(f'Callback received, contains {payload}')
@@ -271,6 +272,28 @@ def test_cancelled(test_bundle_uuid, test_uuid):
 
 
 #  Utils
+
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'context']),methods=['GET'])
+def get_context():
+    return make_response(
+        json.dumps(context),
+        OK,
+        {'Content-Type': 'application/json'}
+    )
+
+
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'debugger']),methods=['GET', 'POST'])
+def dummy_endpoint():
+    if request.method == 'GET':
+        app.logger.debug(f'args: {request.args}')
+        return make_response('{"error": null}, {"message": "hello"}', OK, {'Content-Type': 'application/json'})
+    elif request.method == 'POST':
+        app.logger.debug(f'args: {request.args}')
+        app.logger.debug(f'data:{request.data}')
+        return make_response(request.data, OK, {'Content-Type': 'application/json'})
+
+
+
 
 @app.errorhandler(NOT_FOUND)
 def not_found(error):
