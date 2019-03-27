@@ -290,8 +290,8 @@ def dummy_endpoint():
         return make_response('{"error": null}, {"message": "hello"}', OK, {'Content-Type': 'application/json'})
     elif request.method == 'POST':
         app.logger.debug(f'args: {request.args}')
-        app.logger.debug(f'data:{request.data}')
-        return make_response(request.data, OK, {'Content-Type': 'application/json'})
+        app.logger.debug(f'data:{request.raw}')
+        return make_response(request.raw, OK, {'Content-type': request.headers['Content-type']})
 
 
 
