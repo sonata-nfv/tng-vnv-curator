@@ -142,12 +142,16 @@ def process_test_plan(test_bundle_uuid):
                 ][0]
                 test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
                 nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
+                if len(test_cat) == 0:
+                    test_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd41e51d'}]
+                if len(nsd_cat) == 0:
+                    nsd_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd44e75d'}]
                 try:
                     test_descriptor_instance = generate_test_descriptor_instance(
                         td.copy(),
                         instantiation_params[1]['functions'],
-                        test_uuid=test_cat['uuid'],
-                        service_uuid=nsd_cat['uuid'],
+                        test_uuid=test_cat[0]['uuid'],
+                        service_uuid=nsd_cat[0]['uuid'],
                         package_uuid=inst_result['package_id'],
                         instance_uuid=instantiation_params[1]['nsi_uuid']
                     )
