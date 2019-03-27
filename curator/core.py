@@ -147,8 +147,9 @@ def handle_new_test_plan():
         new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
         try:
             payload = request.get_json()
+            app.logger.debug(f'Received JSON: {payload}')
             # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
-            # if payload.keys() is None and all(key in payload.keys() for key in required_keys):
+            # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
             context['test_preparations'][new_uuid] = payload  # Should have
             process_thread = Thread(target=process_test_plan, args=(new_uuid,))
             process_thread.start()
