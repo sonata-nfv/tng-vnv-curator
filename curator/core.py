@@ -204,7 +204,7 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
                     'functions': payload['functions']
                 }
             )
-            context['events'][test_bundle_uuid][instance_name].clear()  # Unlocks thread
+            context['events'][test_bundle_uuid][instance_name].set()  # Unlocks thread
             return make_response('{"error": null}', OK,{'Content-Type': 'application/json'})
         else:
             # TODO abort test, reason nsi
