@@ -255,7 +255,7 @@ def test_cancelled(test_bundle_uuid, test_uuid):
     # Wrap up, notify
     payload = request.get_json()
     context['test_preparations'][test_bundle_uuid]['test_results'].append(payload)
-    context['events'][test_bundle_uuid][test_uuid].clear()
+    context['events'][test_bundle_uuid][test_uuid].set()
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 

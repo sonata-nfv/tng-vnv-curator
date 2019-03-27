@@ -253,9 +253,9 @@ def cancel_test_plan(test_bundle_uuid, content):
     callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
     for test in [run_test for run_test in context['test_preparations'][test_bundle_uuid]['augmented_descriptors'] if run_test['status'] == 'RUNNING' or run_test['status'] == 'STARTING']:
         context['events'][test_bundle_uuid][test['test_uuid']] = threading.Event()
-        context['events'][test_bundle_uuid][test['test_uuid']].set()
         executor.execution_cancel(test_bundle_uuid, test['test_uuid'])
         context['events'][test_bundle_uuid][test['test_uuid']].wait()
+        del context['events'][test_bundle_uuid][test['test_uuid']]
 
     _LOG.debug(f'Finished cancelation for test-plan {test_bundle_uuid}, '
                f'cleaning up and sending results to planner')
@@ -265,6 +265,7 @@ def cancel_test_plan(test_bundle_uuid, content):
     planner_resp = planner.send_callback(callback_path, test_bundle_uuid,
                                          context['test_preparations'][test_bundle_uuid]['test_results'])
     # if planner_resp ok, clean test_preparations entry
+
     del context['test_preparations'][test_bundle_uuid]
 
 
