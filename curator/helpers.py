@@ -294,14 +294,16 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
     :return:
     """
     _LOG.debug(f'Parsing instantiation parameters, {vars()}')
-    configuration = [
-        [
-            (i, step) for i, step in enumerate(setup_phase['steps'])
-            if step['action'] == 'configure'
-        ]
-        for setup_phase in test_descriptor['phases'] if setup_phase['id'] == 'setup'
-    ][0][0]
-    for probe in configuration[1]['probes']:
+    setup_phase = [(i, phase) for i, phase in enumerate(test_descriptor['phases']) if phase['id'] == 'setup'].pop()
+    configuration_action = [(i, step) for i, step in enumerate(setup_phase[1]['steps']) if step['action'] == 'configure'].pop()
+    # configuration_action = [
+    #     [
+    #         (i, step) for i, step in enumerate(setup_phase['steps'])
+    #         if step['action'] == 'configure'
+    #     ]
+    #     for setup_phase in test_descriptor['phases'] if setup_phase['id'] == 'setup'
+    # ][0][0]
+    for probe in configuration_action[1]['probes']:
         if 'parameters' in probe.keys():
             for i, probe_param in enumerate(probe['parameters']):
                 if probe_param['value'].startswith('$(') and probe_param['value'].endswith(')'):
@@ -309,7 +311,9 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
                     for parameter in instantiation_parameters:
                         if parameter['name'] == path[0]:
                             value = route_from_text(parameter, path[1:])
-                            test_descriptor['phases'][configuration[0]]['probes'][i]['value'] = value
+                            (test_descriptor['phases'][setup_phase[0]]
+                                ['steps'][configuration_action[0]]
+                                ['probes'][i]['value']) = value
     test_descriptor['test_descriptor_uuid'] = test_uuid
     test_descriptor['package_descriptor_uuid'] = package_uuid
     test_descriptor['network_service_descriptor_uuid'] = service_uuid
