@@ -27,6 +27,7 @@
 
 import time
 import requests
+import json
 import logging
 import threading
 from curator.database import context
@@ -56,6 +57,7 @@ def process_test_plan(test_bundle_uuid):
     executor = context['plugins']['executor']
     vnv_cat = context['plugins']['catalogue']
     context['test_preparations'][test_bundle_uuid]['probes'] = []
+    _LOG.debug(f'testd: {json.dumps(td)}')
     configuration_phase = [phase for phase in td['phases'] if phase['action'] == 'configure'].pop()
     for probe in configuration_phase['probes']:
         image = dockeri.pull(probe['image'])
