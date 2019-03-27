@@ -142,26 +142,29 @@ def process_test_plan(test_bundle_uuid):
                 ][0]
                 test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
                 nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
-                test_descriptor_instance = generate_test_descriptor_instance(
-                    td.copy(),
-                    instantiation_params[1]['functions'],
-                    test_uuid=test_cat['uuid'],
-                    service_uuid=nsd_cat['uuid'],
-                    package_uuid=inst_result['package_id'],
-                    instance_uuid=instantiation_params[1]['nsi_uuid']
-                )
-                ex_response = executor.execution_request(test_descriptor_instance, test_bundle_uuid)
-                (context['test_preparations'][test_bundle_uuid]
-                    ['augmented_descriptors'][instantiation_params[0]]
-                    ['test_uuid']) = ex_response['test-uuid']
-                (context['test_preparations'][test_bundle_uuid]
-                    ['augmented_descriptors'][instantiation_params[0]]
-                    ['test_status']) = ex_response['status']
-                (context['test_preparations'][test_bundle_uuid]
-                    ['augmented_descriptors'][instantiation_params[0]]
-                    ['service_platform']) = service_platform
-                del context['events'][test_bundle_uuid][instance_name]
-                _LOG.debug(f'Response from executor: {ex_response}')
+                try:
+                    test_descriptor_instance = generate_test_descriptor_instance(
+                        td.copy(),
+                        instantiation_params[1]['functions'],
+                        test_uuid=test_cat['uuid'],
+                        service_uuid=nsd_cat['uuid'],
+                        package_uuid=inst_result['package_id'],
+                        instance_uuid=instantiation_params[1]['nsi_uuid']
+                    )
+                    ex_response = executor.execution_request(test_descriptor_instance, test_bundle_uuid)
+                    (context['test_preparations'][test_bundle_uuid]
+                        ['augmented_descriptors'][instantiation_params[0]]
+                        ['test_uuid']) = ex_response['test-uuid']
+                    (context['test_preparations'][test_bundle_uuid]
+                        ['augmented_descriptors'][instantiation_params[0]]
+                        ['test_status']) = ex_response['status']
+                    (context['test_preparations'][test_bundle_uuid]
+                        ['augmented_descriptors'][instantiation_params[0]]
+                        ['service_platform']) = service_platform
+                    del context['events'][test_bundle_uuid][instance_name]
+                    _LOG.debug(f'Response from executor: {ex_response}')
+                except Exception as e:
+                    _LOG.error(f'Something happened... {e}')
                 # # Wait for executor callback (?)
                 # context['events'][instance_name].set()
                 # context['events'][instance_name].wait()
