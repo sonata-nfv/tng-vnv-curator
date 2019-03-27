@@ -59,6 +59,7 @@ def process_test_plan(test_bundle_uuid):
     context['test_preparations'][test_bundle_uuid]['probes'] = []
     _LOG.debug(f'testd: {json.dumps(td)}')
     configuration_phase = [phase for phase in td['phases'] if phase['action'] == 'configure'].pop()
+    _LOG.debug(f'configuration_phase: {configuration_phase}')
     for probe in configuration_phase['probes']:
         _LOG.debug(f'Getting {probe["name"]}')
         image = dockeri.pull(probe['image'])
