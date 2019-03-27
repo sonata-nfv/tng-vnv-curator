@@ -54,13 +54,14 @@ app.app_context()
 RequestID(app)
 
 # Setup logging
-# handler = logging.StreamHandler()
-# handler.setFormatter(logging.Formatter("[%(asctime)s] %(name)s %(levelname)s %(module)s.%(funcName)s "
-#                                        "[req_%(request_id)s] - %(message)s"))
-# handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
-# logging.getLogger().addHandler(handler)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("[%(asctime)s] %(name)s %(levelname)s %(module)s.%(funcName)s "
+                                       "[req_%(request_id)s] - %(message)s"))
+handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
+logging.getLogger().addHandler(handler)
 
-_LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
+# _LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
+_LOG = logging.getLogger('flask.app')
 
 API_ROOT = "api"
 API_VERSION = "v1"

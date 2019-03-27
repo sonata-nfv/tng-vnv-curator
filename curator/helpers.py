@@ -38,7 +38,8 @@ from time import sleep
 from curator.logger import TangoLogger
 
 
-_LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
+# _LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
+_LOG = logging.getLogger('flask.app')
 
 
 def process_test_plan(test_bundle_uuid):
