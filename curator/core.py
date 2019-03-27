@@ -275,8 +275,9 @@ def test_cancelled(test_bundle_uuid, test_uuid):
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'context']),methods=['GET'])
 def get_context():
+    f_context = {k: context[k] for k in context.keys() if k != 'plugins' and k != 'threads' and k != 'events'}
     return make_response(
-        json.dumps(context),
+        json.dumps(f_context),
         OK,
         {'Content-Type': 'application/json'}
     )
