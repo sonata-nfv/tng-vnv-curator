@@ -191,6 +191,7 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
     # Notify SP setup blocked thread
     try:
         payload = request.get_json()
+        _LOG.debug(f'Callback received, contains {payload}')
         required_keys = {'ns_instance_uuid', 'functions', 'platform_type'}
         if all(key in payload.keys() for key in required_keys):
             # FIXME: Check which entry contains the corresponding type of platform (with nsi_name)

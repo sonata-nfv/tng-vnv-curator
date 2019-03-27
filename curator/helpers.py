@@ -126,7 +126,10 @@ def process_test_plan(test_bundle_uuid):
                 # nsr = requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}", headers=headers)
                 # for vnfr_ref in nsr['network_functions']:
                 #   vnfr_rec.append(requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}).json())
+                _LOG.debug(f'Waiting for event {test_bundle_uuid}.{instance_name}')
                 context['events'][test_bundle_uuid][instance_name].wait()
+                _LOG.debug(f"Received parameters from SP: "
+                           f"{context['test_preparations'][test_bundle_uuid]['augmented_descriptors']}")
                 instantiation_params = [
                     (p_index, augd) for p_index, augd in
                     enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])

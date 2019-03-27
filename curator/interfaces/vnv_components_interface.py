@@ -339,7 +339,7 @@ class PlatformAdapterInterface(Interface):
         headers = {"Content-type": "application/json"}
         try:
             response = requests.post(url, headers=headers, json=data)
-            _LOG.debug(f'Response {response.content}')
+            _LOG.debug(f'Response {response.text}')
             if response.status_code == 200:  # and not response.json()['error']:
                 return response.json()
             elif response.status_code == 404:
