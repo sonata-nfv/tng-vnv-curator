@@ -30,8 +30,9 @@ import requests
 import logging
 from curator.interfaces.interface import Interface
 from curator.database import context
+from curator.logger import TangoLogger
 
-_LOG = logging.getLogger('flask.app')
+_LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
 
 
 class PlannerInterface(Interface):

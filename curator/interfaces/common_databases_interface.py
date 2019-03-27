@@ -30,8 +30,10 @@ import requests
 import logging
 import shutil
 from curator.interfaces.interface import Interface
+from curator.logger import TangoLogger
 
-_LOG = logging.getLogger('flask.app')
+
+_LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
 
 
 class CatalogueInterface(Interface):

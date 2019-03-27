@@ -42,6 +42,7 @@ from curator.interfaces.docker_interface import DockerInterface
 from curator.worker import Worker
 from curator.helpers import process_test_plan, cancel_test_plan, clean_environment
 import time
+from curator.logger import TangoLogger
 
 
 # def process_test_plan(test_plan):
