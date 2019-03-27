@@ -71,7 +71,7 @@ class CatalogueInterface(Interface):
         headers = {"Content-type": "application/json"}
         try:
             response = requests.get(url + query, headers=headers)
-            _LOG.debug(f'RESP {response.raw}')
+            _LOG.debug(f'RESP {response.content}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
@@ -111,7 +111,7 @@ class CatalogueInterface(Interface):
         _LOG.debug(f'GET {url}{query}')
         try:
             response = requests.get(url + query, headers=headers)
-            _LOG.debug(f'RESP {response.raw}')
+            _LOG.debug(f'RESP {response.content}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
