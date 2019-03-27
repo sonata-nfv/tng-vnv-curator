@@ -332,10 +332,13 @@ class PlatformAdapterInterface(Interface):
                 'test-preparations', test_plan_uuid,
                 'service-instances', instance_name, 'sp-ready'])
         }
+        _LOG.debug(f'Instantiation payload: {data}')
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        _LOG.debug(f'Accesing {url}')
         headers = {"Content-type": "application/json"}
         try:
             response = requests.post(url, headers=headers, json=data)
+            _LOG.debug(f'Response {response.content}')
             if response.status_code == 200:  # and not response.json()['error']:
                 return response.json()
             elif response.status_code == 404:
