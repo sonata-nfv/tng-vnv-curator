@@ -176,6 +176,7 @@ def process_test_plan(test_bundle_uuid):
             elif platform_type == 'OSM':
                 # TODO
                 sp = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
+                # Use uuids, search for nsd and vnfd (or pass nsd uuid to PA and it will go forward)
                 pass
             elif platform_type == 'ONAP':
                 # TODO
