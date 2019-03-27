@@ -47,11 +47,10 @@ def process_test_plan(test_bundle_uuid):
     context['test_preparations'][test_bundle_uuid]['augmented_descriptors'] = []
     context['test_preparations'][test_bundle_uuid]['test_results'] = []
     context['events'][test_bundle_uuid] = {}
-    planner = context['plugins']['planner']
+    # planner = context['plugins']['planner']
     dockeri = context['plugins']['docker']
-    dockeri = dock_i.DockerInterface()
     # planner = vnv_i.PlannerInterface()
-    planner.add_new_test_plan(test_bundle_uuid)
+    # planner.add_new_test_plan(test_bundle_uuid)
     platforms = td['service_platforms']  # should be a list
     platform_adapter = context['plugins']['platform_adapter']
     executor = context['plugins']['executor']
@@ -249,8 +248,6 @@ def cancel_test_plan(test_bundle_uuid, content):
                                          context['test_preparations'][test_bundle_uuid]['test_results'])
     # if planner_resp ok, clean test_preparations entry
     del context['test_preparations'][test_bundle_uuid]
-
-
 
 
 def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,

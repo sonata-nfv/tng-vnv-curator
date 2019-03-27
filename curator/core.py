@@ -135,7 +135,7 @@ def list_routes():
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations']),
-           methods=['GET','POST'])
+           methods=['GET', 'POST'])
 def handle_new_test_plan():
     if request.method == 'GET':
         return make_response(
@@ -147,19 +147,19 @@ def handle_new_test_plan():
         new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
         try:
             payload = request.get_json()
-            required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
-            if all(key in payload.keys() for key in required_keys):
-                context['test_preparations'][new_uuid] = payload  # Should have
-                process_thread = Thread(target=process_test_plan, args=(new_uuid,))
-                process_thread.start()
-                context['threads'].append(process_thread)
-                return make_response({'test-plan-uuid': new_uuid, 'status': 'STARTING'}, CREATED, {'Content-Type': 'application/json'})
-            else:
-                return make_response(
-                    json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
-                    BAD_REQUEST,
-                    {'Content-Type': 'application/json'}
-                )
+            # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
+            # if payload.keys() is None and all(key in payload.keys() for key in required_keys):
+            context['test_preparations'][new_uuid] = payload  # Should have
+            process_thread = Thread(target=process_test_plan, args=(new_uuid,))
+            process_thread.start()
+            context['threads'].append(process_thread)
+            return make_response({'test-plan-uuid': new_uuid, 'status': 'STARTING'}, CREATED, {'Content-Type': 'application/json'})
+            # else:
+            #     return make_response(
+            #         json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
+            #         BAD_REQUEST,
+            #         {'Content-Type': 'application/json'}
+            #     )
         except Exception as e:
             return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
