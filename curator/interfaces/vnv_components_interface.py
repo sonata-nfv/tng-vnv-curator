@@ -428,6 +428,8 @@ class ExecutorInterface(Interface):
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
         self.base_url = os.getenv('executor_base')
+        self.version = 'v1'
+        self.api = 'api'
         self.events = []
 
     def execution_request(self, tdi, test_plan_uuid):
@@ -461,7 +463,7 @@ class ExecutorInterface(Interface):
                 }
             ]
         }
-        url = '/'.join([self.base_url, 'test-executions'])
+        url = '/'.join([self.base_url, self.api, self.version, 'test-executions'])
         headers = {"Content-type": "application/json"}
         _LOG.debug(f'Sending to executor {url} with payload {json.dumps(data)}')
 
