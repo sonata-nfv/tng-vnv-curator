@@ -1,0 +1,107 @@
+network_service_descriptor:
+  author: 5GTANGO Developer
+  connection_points:
+  - {id: mgmt, interface: ipv4, type: management}
+  - {id: input, interface: ipv4, type: external}
+  - {id: output, interface: ipv4, type: external}
+  description: Default description
+  descriptor_schema: https://raw.githubusercontent.com/sonata-nfv/tng-schema/master/service-descriptor/nsd-schema.yml
+  name: 5gtango-project-sample
+  network_functions:
+  - {vnf_id: vnf0, vnf_name: default-vnf0, vnf_vendor: eu.5gtango, vnf_version: '0.9'}
+  vendor: eu.5gtango
+  version: '0.1'
+  virtual_links:
+  - connection_points_reference: ['vnf0:mgmt', mgmt]
+    connectivity_type: E-LAN
+    id: mgmt
+  - connection_points_reference: [input, 'vnf0:input']
+    connectivity_type: E-Line
+    id: input-2-vnf1
+  - connection_points_reference: ['vnf0:output', output]
+    connectivity_type: E-Line
+    id: vnf0-2-output
+paths: ''
+test_descriptor:
+  author: Ignacio Dominguez, Felipe Vicens (ATOS)
+  description: Performance test for video analysis
+  descriptor_schema: https://raw.githubusercontent.com/sonata-nfv/tng-schema/master/test-descriptor/testdescriptor-schema.yml
+  name: test-immersive-media
+  phases:
+  - id: setup
+    steps:
+    - {action: deploy, description: Deploying a NS, name: deployment}
+    - action: configure
+      description: null
+      name: configuration
+      probes:
+      - description: A service initial configuration container
+        id: initiator
+        image: sonatanfv/tng-media-pilot-initiator
+        name: initiator
+        parameters:
+        - {key: CAMERA, value: test}
+        - {key: CMS, value: '$(default-vnf0/endpoints/id:output/address)'}
+      - description: Content Producer Emulator (CPE) To generate a RTMP flow
+        id: cpe
+        image: sonatanfv/tng-media-pilot-cpe
+        name: cpe
+        parameters:
+        - {key: AGGREGATOR, value: '$(default-vnf0/endpoints/id:mgmt/address)'}
+        - {key: APP, value: test}
+        - {key: STREAM, value: test}
+      - description: Content Consumer Emulator (CCE) To play HLS flows from Streaming
+          engine
+        id: cce
+        image: sonatanfv/tng-media-pilot-cce
+        name: cce
+        parameters:
+        - {key: STREAMMING_ENGINE, value: '$(default-vnf0/endpoints/id:input/address)'}
+        - {key: STREAM, value: test}
+  - id: excercise
+    steps:
+    - description: Configuration of the service previuos start tests
+      index: 0
+      instances: 1
+      name: configure_service
+      output:
+      - {results: logs.txt, verdict: status.txt}
+      run: initiator
+      start_delay: 0
+    - dependencies: [initiator]
+      description: Starting the CPE that simulates the camera
+      index: 1
+      instances: 1
+      name: run_camera
+      output:
+      - {graphs: detail.json, results: logs.txt}
+      run: cpe
+      start_delay: 5
+    - dependencies: [cpe]
+      description: Starting the CCE that simulates the consumer
+      index: 2
+      instances: 10
+      name: run_players
+      output:
+      - {graphs: detail.json, results: logs.txt}
+      run: cce
+      start_delay: 15
+  - id: verification
+    steps:
+    - condition:
+      - parser:
+        - {file: status.txt, find: OK, value: present, verdict: pass}
+      description: Check service was configured
+      name: configuration
+      step: configure_service
+    - condition:
+      - parser:
+        - {file: detail.json, find: error_rate, type: json, value: < 0.05, verdict: pass}
+      description: Check bandwithd received
+      name: user_experience
+      step: run_players
+  service_platforms: [SONATA]
+  test_category: [benchmarking]
+  test_tags: [rtmp-media-service]
+  vendor: eu.5gtango.atos
+  version: '0.1'

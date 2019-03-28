@@ -193,8 +193,8 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
     app.logger.debug(f'Callback received, contains {request.get_data()}, '
                      f'Content-type: {request.headers["Content-type"]}')
     try:
-        # payload = request.get_json()
-        payload = json.loads(request.get_data().decode("UTF-8"))
+        payload = request.get_json()
+        # payload = json.loads(request.get_data().decode("UTF-8"))
         # _LOG.debug(f'Callback received, contains {payload}')
         app.logger.debug(f'Callback received, contains {payload}')
         required_keys = {'ns_instance_uuid', 'functions', 'platform_type'}
@@ -303,8 +303,6 @@ def dummy_endpoint():
                 app.logger.debug(f'Data is not Json Serializable, Content: {request.get_data()}')
 
         return make_response(request.get_data(), OK, {'Content-type': request.headers['Content-type']})
-
-
 
 
 @app.errorhandler(NOT_FOUND)
