@@ -331,6 +331,7 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
                         if parameter['name'] == path[0]:
                             value = route_from_text(parameter, path[1:])
                             probe_param['value'] = value
+    # TODO: warn or error when there are expected parameters that are missing
     test_descriptor['test_descriptor_uuid'] = test_uuid
     test_descriptor['package_descriptor_uuid'] = package_uuid
     test_descriptor['network_service_descriptor_uuid'] = service_uuid
@@ -363,17 +364,17 @@ def route_from_text(obj, route):
     :param route:
     :return:
     """
-    # _LOG.debug(f'Looking for {route} in {obj}')
+    _LOG.debug(f'Looking for {route} in {obj}')
     if len(route) > 1 and ':' in route[0]:
-        # _LOG.debug('Is a dictionary nested inside a list')
+        _LOG.debug('Is a dictionary nested inside a list')
         res = [d for d in obj if d[route[0].split(':')[0]] == route[0].split(':')[1]][0]
         tail = route_from_text(res, route[1:])
     elif len(route) > 1 and ':' not in route[0]:
-        # _LOG.debug('Is a dictionary nested inside a dictionary')
+        _LOG.debug('Is a dictionary nested inside a dictionary')
         res = obj[route[0]]
         tail = route_from_text(res, route[1:])
     elif len(route) == 1:
-        # _LOG.debug('Is an object')
+        _LOG.debug('Is an object')
         tail = obj[route[0]]
     else:
         raise ValueError(obj, route)

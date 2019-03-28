@@ -489,7 +489,7 @@ class ExecutorInterface(Interface):
                 }
             ]
         }
-        url = '/'.join([self.base_url, 'test-executions', test_uuid, 'cancel'])
+        url = '/'.join([self.base_url, self.api, self.version, 'test-executions', test_uuid, 'cancel'])
         headers = {"Content-type": "application/json"}
         try:
             response = requests.post(url, headers=headers, json=data)
