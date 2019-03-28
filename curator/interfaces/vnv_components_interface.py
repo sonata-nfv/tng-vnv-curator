@@ -28,6 +28,7 @@
 import os
 import requests
 import logging
+import json
 from curator.interfaces.interface import Interface
 from curator.database import context
 from curator.logger import TangoLogger
@@ -462,8 +463,11 @@ class ExecutorInterface(Interface):
         }
         url = '/'.join([self.base_url, 'test-executions'])
         headers = {"Content-type": "application/json"}
+        _LOG.debug(f'Sending to executor {url} with payload {json.dumps(data)}')
+
         try:
             response = requests.post(url, headers=headers, json=data)
+            _LOG.debug(f'RESPONSE: {response.json()}')
             if response.status_code == 200:  # and not response.json()['error']:
                 return response.json()
             elif response.status_code == 404:
