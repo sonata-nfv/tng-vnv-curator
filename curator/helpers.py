@@ -312,9 +312,7 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
                     for parameter in instantiation_parameters:
                         if parameter['name'] == path[0]:
                             value = route_from_text(parameter, path[1:])
-                            (test_descriptor['phases'][setup_phase[0]]
-                                ['steps'][configuration_action[0]]
-                                ['probes'][i]['value']) = value
+                            probe_param['value'] = value
     test_descriptor['test_descriptor_uuid'] = test_uuid
     test_descriptor['package_descriptor_uuid'] = package_uuid
     test_descriptor['network_service_descriptor_uuid'] = service_uuid
