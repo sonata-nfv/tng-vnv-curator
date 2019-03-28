@@ -65,12 +65,16 @@ def process_test_plan(test_bundle_uuid):
     _LOG.debug(f'configuration_phase: {configuration_action}')
     for probe in configuration_action['probes']:
         _LOG.debug(f'Getting {probe["name"]}')
-        # image = dockeri.pull(probe['image'])
+        try:
+            image = dockeri.pull(probe['image'])
+            image_id = image.short_id
+        except Exception as e:
+            _LOG.exception(e)
+            image_id = f'aa-bb-cc-dd-{probe["name"]}'
 
         context['test_preparations'][test_bundle_uuid]['probes'].append(
             {
-                # 'id': image.short_id,
-                'id': 'aa-bb-cc-dd' + probe['name'],
+                'id': image_id,
                 'name': probe['name'],
                 'image': probe['image']
             }
@@ -138,8 +142,19 @@ def process_test_plan(test_bundle_uuid):
                 instantiation_params = [
                     (p_index, augd) for p_index, augd in
                     enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
-                    if augd['platform'] == platform_type.lower()
-                ][0]
+                    if augd['platform'] == platform_type.lower() and not augd['error']
+                ]
+                if len(instantiation_params) < 1:
+                    error_params = instantiation_params = [
+                        (p_index, augd) for p_index, augd in
+                        enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
+                        if augd['error'] and augd['nsi_name'] == instance_name
+                    ]
+                    if error_params:
+                        _LOG.error(f'Received error from PA: {error_params}')
+                        # Send callback to planner
+                        raise ValueError(error_params[0])
+
                 test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
                 nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
                 if len(test_cat) == 0:
@@ -149,27 +164,30 @@ def process_test_plan(test_bundle_uuid):
                 try:
                     test_descriptor_instance = generate_test_descriptor_instance(
                         td.copy(),
-                        instantiation_params[1]['functions'],
+                        instantiation_params[0][1]['functions'],
                         test_uuid=test_cat[0]['uuid'],
                         service_uuid=nsd_cat[0]['uuid'],
                         package_uuid=inst_result['package_id'],
-                        instance_uuid=instantiation_params[1]['nsi_uuid']
+                        instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
                     ex_response = executor.execution_request(test_descriptor_instance, test_bundle_uuid)
                     (context['test_preparations'][test_bundle_uuid]
-                        ['augmented_descriptors'][instantiation_params[0]]
+                        ['augmented_descriptors'][instantiation_params[0][0]]
                         ['test_uuid']) = ex_response['test-uuid']
                     (context['test_preparations'][test_bundle_uuid]
-                        ['augmented_descriptors'][instantiation_params[0]]
+                        ['augmented_descriptors'][instantiation_params[0][0]]
                         ['test_status']) = ex_response['status']
                     (context['test_preparations'][test_bundle_uuid]
-                        ['augmented_descriptors'][instantiation_params[0]]
+                        ['augmented_descriptors'][instantiation_params[0][0]]
                         ['service_platform']) = service_platform
                     del context['events'][test_bundle_uuid][instance_name]
                     _LOG.debug(f'Response from executor: {ex_response}')
                 except Exception as e:
                     _LOG.exception(f'Something happened... {e}')
+                    # Call cleanup for which was deployed if there are no more tests running,
+                    # log the error
+
 
                 # # Wait for executor callback (?)
                 # context['events'][instance_name].set()
@@ -208,7 +226,7 @@ def process_test_plan(test_bundle_uuid):
     # LOG.debug('completed ' + test_plan)
 
 
-def clean_environment(test_bundle_uuid, test_id, content):
+def clean_environment(test_bundle_uuid, test_id=None, content=None, error=None):
     _LOG.info(f'Test {test_id} from test-plan {test_bundle_uuid} finished')
     platform_adapter = context['plugins']['platform_adapter']
     dockeri = context['plugins']['docker']

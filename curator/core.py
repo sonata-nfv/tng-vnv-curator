@@ -204,13 +204,24 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
             context['test_preparations'][test_bundle_uuid]['augmented_descriptors'].append(
                 {
                     'nsi_uuid': payload['ns_instance_uuid'],
-                    # 'nsi_name': payload['instance_name'],
+                    'nsi_name': instance_name,
                     'platform': payload['platform_type'],
-                    'functions': payload['functions']
+                    'functions': payload['functions'],
+                    'error': None
                 }
             )
             context['events'][test_bundle_uuid][instance_name].set()  # Unlocks thread
             return make_response('{"error": null}', OK,{'Content-Type': 'application/json'})
+        elif 'error' in payload.keys():
+            context['test_preparations'][test_bundle_uuid]['augmented_descriptors'].append(
+                {
+                    'nsi_uuid': None,
+                    'platform': 'unknown',
+                    'functions': None,
+                    'nsi_name': instance_name,
+                    'error': payload['error']
+                }
+            )
         else:
             # TODO abort test, reason nsi
             return make_response(
