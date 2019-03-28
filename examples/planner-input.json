@@ -5,7 +5,7 @@
     "name":"test-immersive-media",
     "version":"0.1",
     "author":"Ignacio Dominguez, Felipe Vicens (ATOS)",
-    "description":"\"Performance test for video analysis\"\n",
+    "description":"Performance test for video analysis",
     "service_platforms":[
       "SONATA"
     ],
@@ -41,7 +41,7 @@
                   },
                   {
                     "key":"CMS",
-                    "value":"cms-vnfd.api.serviceendpoint"
+                    "value":"$(default-vnf0/endpoints/id:output/address)"
                   }
                 ]
               },
@@ -53,7 +53,7 @@
                 "parameters":[
                   {
                     "key":"AGGREGATOR",
-                    "value":"ma-vnfd.rtmp.serviceendpoint"
+                    "value":"$(default-vnf0/endpoints/id:mgmt/address)"
                   },
                   {
                     "key":"APP",
@@ -73,7 +73,7 @@
                 "parameters":[
                   {
                     "key":"STREAMMING_ENGINE",
-                    "value":"mse-vnfd.hls.serviceendpoint"
+                    "value":"$(default-vnf0/endpoints/id:input/address)"
                   },
                   {
                     "key":"STREAM",
@@ -180,18 +180,18 @@
       }
     ]
   },
-  "network_service_descriptor":{
+  "network_service_descriptor": {
     "descriptor_schema":"https://raw.githubusercontent.com/sonata-nfv/tng-schema/master/service-descriptor/nsd-schema.yml",
     "vendor":"eu.5gtango",
-    "name":"default-nsd",
-    "version":"0.9",
+    "name":"5gtango-project-sample",
+    "version":"0.1",
     "author":"5GTANGO Developer",
-    "description":"A default NSD with one default VNFDs",
+    "description":"Default description",
     "network_functions":[
       {
-        "vnf_id":"vnf1",
+        "vnf_id":"vnf0",
         "vnf_vendor":"eu.5gtango",
-        "vnf_name":"ubuntu-vnf",
+        "vnf_name":"default-vnf0",
         "vnf_version":"0.9"
       }
     ],
@@ -217,8 +217,7 @@
         "id":"mgmt",
         "connectivity_type":"E-LAN",
         "connection_points_reference":[
-          "vnf1:mgmt",
-          "vnf2:mgmt",
+          "vnf0:mgmt",
           "mgmt"
         ]
       },
@@ -227,56 +226,18 @@
         "connectivity_type":"E-Line",
         "connection_points_reference":[
           "input",
-          "vnf1:input"
+          "vnf0:input"
         ]
       },
       {
-        "id":"vnf1-2-output",
+        "id":"vnf0-2-output",
         "connectivity_type":"E-Line",
         "connection_points_reference":[
-          "vnf1:output",
+          "vnf0:output",
           "output"
-        ]
-      }
-    ],
-    "forwarding_graphs":[
-      {
-        "fg_id":"fg01",
-        "number_of_endpoints":2,
-        "number_of_virtual_links":2,
-        "constituent_virtual_links":[
-          "input-2-vnf1",
-          "vnf1-2-output"
-        ],
-        "constituent_vnfs":[
-          "vnf1"
-        ],
-        "network_forwarding_paths":[
-          {
-            "fp_id":"fg01:fp01",
-            "policy":"none",
-            "connection_points":[
-              {
-                "connection_point_ref":"input",
-                "position":1
-              },
-              {
-                "connection_point_ref":"vnf1:input",
-                "position":2
-              },
-              {
-                "connection_point_ref":"vnf1:output",
-                "position":3
-              },
-              {
-                "connection_point_ref":"output",
-                "position":4
-              }
-            ]
-          }
         ]
       }
     ]
   },
-  "paths":"",
+  "paths":""
 }
