@@ -198,7 +198,7 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
         # _LOG.debug(f'Callback received, contains {payload}')
         app.logger.debug(f'Callback received, contains {payload}')
         required_keys = {'ns_instance_uuid', 'functions', 'platform_type'}
-        if all(key in payload.keys() for key in required_keys and not 'error' in payload.keys()):
+        if all(key in payload.keys() for key in required_keys) and 'error' not in payload.keys():
             # FIXME: Check which entry contains the corresponding type of platform (with nsi_name)
             # FIXME: or ask it in the callback
             context['test_preparations'][test_bundle_uuid]['augmented_descriptors'].append(
