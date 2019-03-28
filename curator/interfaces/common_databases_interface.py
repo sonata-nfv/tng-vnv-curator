@@ -30,7 +30,10 @@ import requests
 import logging
 import shutil
 from curator.interfaces.interface import Interface
+from curator.logger import TangoLogger
 
+
+# _LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
 _LOG = logging.getLogger('flask.app')
 
 
@@ -40,7 +43,7 @@ class CatalogueInterface(Interface):
     """
     def __init__(self):
         Interface.__init__(self)
-        self.base_url = os.getenv('platform_adapter_base')
+        self.base_url = os.getenv('cat_base')
         self.VERSION = 'v2'
 
     def get_network_descriptor(self, network_uuid):
@@ -54,7 +57,7 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_network_descriptor_tuple(self, vendor, name, version):
@@ -64,15 +67,17 @@ class CatalogueInterface(Interface):
             '='.join(['name', name]),
             '='.join(['version', version]),
         ])
+        _LOG.debug(f'GET {url}{query}')
         headers = {"Content-type": "application/json"}
         try:
             response = requests.get(url + query, headers=headers)
+            _LOG.debug(f'RESP {response.content}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_test_descriptor(self, test_uuid):
@@ -85,7 +90,7 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_test_descriptor_tuple(self, vendor, name, version):
@@ -103,14 +108,16 @@ class CatalogueInterface(Interface):
             '='.join(['version', version]),
         ])
         headers = {"Content-type": "application/json"}
+        _LOG.debug(f'GET {url}{query}')
         try:
             response = requests.get(url + query, headers=headers)
+            _LOG.debug(f'RESP {response.content}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_package_from_nsd_tuple(self, vendor, name, version):
@@ -181,7 +188,7 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_package_descriptor(self, package_uuid):
@@ -199,7 +206,7 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_tgo_package_binary(self, tgo_package_uuid, tgo_package_name):
@@ -222,5 +229,5 @@ class CatalogueInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e

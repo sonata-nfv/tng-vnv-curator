@@ -40,8 +40,9 @@ from curator.interfaces.vnv_components_interface import PlannerInterface, Execut
 from curator.interfaces.common_databases_interface import CatalogueInterface
 from curator.interfaces.docker_interface import DockerInterface
 from curator.worker import Worker
-from curator.helpers import process_test_plan, cancel_test_plan
+from curator.helpers import process_test_plan, cancel_test_plan, clean_environment
 import time
+from curator.logger import TangoLogger
 
 
 # def process_test_plan(test_plan):
@@ -59,6 +60,8 @@ handler.setFormatter(logging.Formatter("[%(asctime)s] %(name)s %(levelname)s %(m
 handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
 logging.getLogger().addHandler(handler)
 
+# _LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
+# _LOG = logging.getLogger('flask.app')
 
 API_ROOT = "api"
 API_VERSION = "v1"
@@ -135,10 +138,10 @@ def list_routes():
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations']),
-           methods=['GET','POST'])
+           methods=['GET', 'POST'])
 def handle_new_test_plan():
     if request.method == 'GET':
-        return make_response()(
+        return make_response(
             json.dumps(context['test_preparations']),
             OK,
             {'Content-Type': 'application/json'}
@@ -147,18 +150,21 @@ def handle_new_test_plan():
         new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
         try:
             payload = request.get_json()
-            required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
-            if all(key in payload.keys() for key in required_keys):
-                context['test_preparations'][new_uuid] = payload  # Should have
-                process_thread = Thread(target=process_test_plan, args=(new_uuid,))
-                process_thread.start()
-                return make_response({'test-plan-uuid': new_uuid, 'status': 'STARTING'}, CREATED, {'Content-Type': 'application/json'})
-            else:
-                return make_response(
-                    json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
-                    BAD_REQUEST,
-                    {'Content-Type': 'application/json'}
-                )
+            app.logger.debug(f'Received JSON: {payload}')
+            # _LOG.debug(f'Received JSON: {payload}')
+            # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
+            # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
+            context['test_preparations'][new_uuid] = payload  # Should have
+            process_thread = Thread(target=process_test_plan, args=(new_uuid,))
+            process_thread.start()
+            context['threads'].append(process_thread)
+            return make_response(json.dumps({'test-plan-uuid': new_uuid, 'status': 'STARTING'}), CREATED, {'Content-Type': 'application/json'})
+            # else:
+            #     return make_response(
+            #         json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
+            #         BAD_REQUEST,
+            #         {'Content-Type': 'application/json'}
+            #     )
         except Exception as e:
             return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
@@ -166,7 +172,8 @@ def handle_new_test_plan():
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>']),
            methods=['DELETE'])
 def test_plan_cancelled(test_bundle_uuid):
-    app.logger.debug('Hello')
+    app.logger.debug(f'Canceling test_plan ')
+    # _LOG.debug(f'Canceling test_plan ')
     process_thread = Thread(target=cancel_test_plan, args=(request.get_json(), test_bundle_uuid))
     process_thread.start()
     return make_response('{"error": null}', ACCEPTED, {'Content-Type': 'application/json'})
@@ -183,21 +190,26 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
     :return:
     """
     # Notify SP setup blocked thread
+    app.logger.debug(f'Callback received, contains {request.get_data()}, '
+                     f'Content-type: {request.headers["Content-type"]}')
     try:
-        payload = request.get_json()
-        required_keys = {'ns_instance_uuid', 'functions'}
+        # payload = request.get_json()
+        payload = json.loads(request.get_data().decode("UTF-8"))
+        # _LOG.debug(f'Callback received, contains {payload}')
+        app.logger.debug(f'Callback received, contains {payload}')
+        required_keys = {'ns_instance_uuid', 'functions', 'platform_type'}
         if all(key in payload.keys() for key in required_keys):
             # FIXME: Check which entry contains the corresponding type of platform (with nsi_name)
             # FIXME: or ask it in the callback
             context['test_preparations'][test_bundle_uuid]['augmented_descriptors'].append(
                 {
                     'nsi_uuid': payload['ns_instance_uuid'],
-                    'nsi_name': payload['instance_name'],
-                    'platform': payload['sonata'],
+                    # 'nsi_name': payload['instance_name'],
+                    'platform': payload['platform_type'],
                     'functions': payload['functions']
                 }
             )
-            context['events'][instance_name].clear()  # Unlocks thread
+            context['events'][test_bundle_uuid][instance_name].set()  # Unlocks thread
             return make_response('{"error": null}', OK,{'Content-Type': 'application/json'})
         else:
             # TODO abort test, reason nsi
@@ -221,8 +233,14 @@ def test_in_execution(test_bundle_uuid):
     :return:
     """
     try:
-        context['test_preparations'][test_bundle_uuid]['test_instances_running'].append(request.get_json()['test_id'])
-        return make_response({}, OK, {'Content-Type': 'application/json'})
+        executor_payload = request.get_json()
+        test_index = next(
+            (index for (index, d) in
+                enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
+                if d['test_uuid'] == executor_payload['test-uuid']), None)
+        (context['test_preparations'][test_bundle_uuid]['augmented_descriptors']
+            [test_index]['status']) = executor_payload['status']
+        return make_response('{}', OK, {'Content-Type': 'application/json'})
     except Exception as e:
         return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
@@ -231,7 +249,7 @@ def test_in_execution(test_bundle_uuid):
     ['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'tests', '<test_uuid>', 'finish']),
     methods=['POST'])
 def test_finished(test_bundle_uuid, test_uuid):
-    # Wrap up
+    process_thread = Thread(target=clean_environment, args=(test_bundle_uuid, test_uuid, request.get_json(),))
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 
@@ -240,6 +258,9 @@ def test_finished(test_bundle_uuid, test_uuid):
     methods=['POST'])
 def test_cancelled(test_bundle_uuid, test_uuid):
     # Wrap up, notify
+    payload = request.get_json()
+    context['test_preparations'][test_bundle_uuid]['test_results'].append(payload)
+    context['events'][test_bundle_uuid][test_uuid].set()
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 
@@ -254,6 +275,38 @@ def test_cancelled(test_bundle_uuid, test_uuid):
 
 #  Utils
 
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'context']),methods=['GET'])
+def get_context():
+    f_context = {k: context[k] for k in context.keys() if k != 'plugins' and k != 'threads' and k != 'events'}
+    return make_response(
+        json.dumps(f_context),
+        OK,
+        {'Content-Type': 'application/json'}
+    )
+
+
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'debugger']),methods=['GET', 'POST'])
+def dummy_endpoint():
+    if request.method == 'GET':
+        app.logger.debug(f'args: {request.args}')
+        return make_response('{"error": null}, {"message": "hello"}', OK, {'Content-Type': 'application/json'})
+    elif request.method == 'POST':
+        app.logger.debug(f'headers: {request.headers}')
+        app.logger.debug(f'data:{request.get_data()}')
+        if request.headers['Content-type'] == 'application/json':
+            app.logger.debug(f'Content-type is json encoded! Content: {request.get_json()}')
+        else:
+            try:
+                app.logger.debug(f'Content-type is NOT json encoded but it is json compatible, '
+                                 f'Content: {json.loads(request.get_data().decode("UTF-8"))}')
+            except:
+                app.logger.debug(f'Data is not Json Serializable, Content: {request.get_data()}')
+
+        return make_response(request.get_data(), OK, {'Content-type': request.headers['Content-type']})
+
+
+
+
 @app.errorhandler(NOT_FOUND)
 def not_found(error):
     return make_response(json.dumps({'code': '404 Not Found', 'message': error.description}),
@@ -263,6 +316,7 @@ def not_found(error):
 @app.after_request
 def after_request(response):
     app.logger.info(f'{request.remote_addr} {request.scheme} {request.method}'
+    # _LOG.info(f'{request.remote_addr} {request.scheme} {request.method}'
                     f' {request.full_path} {response.status} {response.content_length}')
     response.headers.add('X-REQUEST-ID', current_request_id())
     return response
@@ -285,6 +339,7 @@ def main():
         'docker': docker_iface
     }
     context['events'] = {}
+    context['threads'] = []
     app.run(debug=True, host='0.0.0.0', port=context['host'].split(':')[1], threaded=True)
 
 

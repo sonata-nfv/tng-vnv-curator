@@ -30,7 +30,9 @@ import requests
 import logging
 from curator.interfaces.interface import Interface
 from curator.database import context
+from curator.logger import TangoLogger
 
+# _LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
 _LOG = logging.getLogger('flask.app')
 
 
@@ -51,15 +53,21 @@ class PlannerInterface(Interface):
     """
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
-        self.__base_url = os.getenv('platform_adapter_base')
+        self.__base_url = os.getenv('planner_base')
         self.__running_test_plans = []
 
     def add_new_test_plan(self, test_plan_uuid):
         self.__running_test_plans.append(test_plan_uuid)
 
-    def send_callback(self, suffix, payload):
+    def send_callback(self, suffix, test_plan_uuid, results_uuid):
         url = self.__base_url + suffix
-        resp = requests.post(url, json=payload)
+        payload = {
+            'test-plan-uuid': test_plan_uuid,
+            'results-uuid': results_uuid,
+            'status': 'COMPLETED',
+        }
+        headers = {"Content-type": "application/json"}
+        resp = requests.post(url, headers=headers, json=payload)
         return resp
 
 
@@ -83,20 +91,22 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def available_platforms_by_type(self, sp_type):
         url = '/'.join([self.base_url, 'service_platforms'])
         headers = {"Content-type": "application/json"}
         try:
+            _LOG.debug(f'Getting {url}')
             response = requests.get(url, headers=headers)
+            _LOG.debug(f'Response {response.json()}')
             if response.status_code == 200:
                 return list(filter(lambda x: x['type'] == sp_type, response.json()))
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def remote_download_package(self, package_id):
@@ -115,7 +125,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def transfer_package_sonata(self, package_info, service_platform):
@@ -152,7 +162,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_service_instantiations_inventory(self, service_platform):
@@ -193,7 +203,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def get_service_instantiation(self, service_platform, service_uuid):
@@ -235,7 +245,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def instantiate_service_sonata(self, service_platform, service_uuid,
@@ -296,26 +306,26 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def automated_instantiation_sonata(self, service_platform,
-                                       package_name, package_vendor, package_version,
+                                       service_name, service_vendor, service_version,
                                        instance_name, test_plan_uuid):
         """
         Simpler version to instantiate a service, working for sonata
         :param service_platform:
-        :param package_name:
-        :param package_vendor:
-        :param package_version:
+        :param service_name:
+        :param service_vendor:
+        :param service_version:
         :param instance_name:
         :param callback:
         :return: network_service
         """
         data = {
-            "name": package_name,
-            "vendor": package_vendor,
-            "version": package_version,
+            "service_name": service_name,
+            "service_vendor": service_vendor,
+            "service_version": service_version,
             "service_platform": service_platform,
             "instance_name": instance_name,
             "callback": '/'.join([
@@ -324,16 +334,21 @@ class PlatformAdapterInterface(Interface):
                 'test-preparations', test_plan_uuid,
                 'service-instances', instance_name, 'sp-ready'])
         }
-        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        _LOG.debug(f'Instantiation payload: {data}')
+        url = '/'.join([self.base_url, 'adapters', 'instantiate_service'])
+        _LOG.debug(f'Accesing {url}')
         headers = {"Content-type": "application/json"}
         try:
             response = requests.post(url, headers=headers, json=data)
+            _LOG.debug(f'Response {response.text}')
             if response.status_code == 200:  # and not response.json()['error']:
                 return response.json()
             elif response.status_code == 404:
-                raise FileNotFoundError
+                raise FileNotFoundError(response.json)
+            else:
+                raise Exception(response.json())
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def instantiate_service_osm(self, service_platform, nsd_name, ns_name, vim_account, instance_name):
@@ -351,8 +366,19 @@ class PlatformAdapterInterface(Interface):
         """
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
 
-    def shutdown_package(self, service_platform, package_uuid):
+    def shutdown_package(self, service_platform, instance_uuid):
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        data = {"instance_uuid": instance_uuid, "request_type": "TERMINATE_SERVICE"}
+        headers = {"Content-type": "application/json"}
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 404:
+                raise FileNotFoundError
+        except Exception as e:
+            _LOG.exception(e)
+            raise e
 
     def upload_package(self, platform, package_file_uuid):
         """
@@ -371,7 +397,7 @@ class PlatformAdapterInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
     def delete_package(self, platform, package_uuid, name=None, vendor=None, version=None):
@@ -404,20 +430,35 @@ class ExecutorInterface(Interface):
         self.events = []
 
     def execution_request(self, tdi, test_plan_uuid):
+        """
+
+        :param tdi:
+        :param test_plan_uuid:
+        :return:
+        """
         # TODO: Specify content in the callbacks?
         data = {
-            'tdi': tdi,
-            "callbacks": {
-                'ERROR': '/'.join(
-                    ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
-                     test_plan_uuid, 'tests','<test_uuid>', 'cancel']),
-                'RUNNING': '/'.join(
-                    ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
-                     test_plan_uuid, 'change']),
-                'COMPLETED': '/'.join(
-                    ['http:/', context['host'], self.own_api_root, self.own_api_version, 'test-preparations',
-                     test_plan_uuid, 'tests', '<test_uuid>', 'finish']),
-            }
+            'test': tdi,
+            "callbacks": [
+                {
+                    'name': 'running',
+                    'path': '/'.join(
+                        ['http:/', context['host'], self.own_api_root, self.own_api_version,
+                         'test-preparations', test_plan_uuid, 'change'])
+                },
+                {
+                    'name': 'cancel',
+                    'path': '/'.join(
+                        ['http:/', context['host'], self.own_api_root, self.own_api_version,
+                         'test-preparations', test_plan_uuid, 'tests', '<test_uuid>', 'cancel'])
+                },
+                {
+                    'name': 'finish',
+                    'path': '/'.join(
+                        ['http:/', context['host'], self.own_api_root, self.own_api_version,
+                         'test-preparations', test_plan_uuid, 'tests', '<test_uuid>', 'finish'])
+                }
+            ]
         }
         url = '/'.join([self.base_url, 'test-executions'])
         headers = {"Content-type": "application/json"}
@@ -428,11 +469,31 @@ class ExecutorInterface(Interface):
             elif response.status_code == 404:
                 raise FileNotFoundError
         except Exception as e:
-            _LOG.error(e)
+            _LOG.exception(e)
             raise e
 
-    def execution_cancel(self, test_uuid):
-        # Send Callbacks
+    def execution_cancel(self, test_plan_uuid, test_uuid):
+        data = {
+            "callbacks": [
+                {
+                    'name': 'cancel',
+                    'path': '/'.join(
+                        ['http:/', context['host'], self.own_api_root, self.own_api_version,
+                         'test-preparations', test_plan_uuid, 'tests', '<test_uuid>', 'cancel'])
+                }
+            ]
+        }
         url = '/'.join([self.base_url, 'test-executions', test_uuid, 'cancel'])
-
+        headers = {"Content-type": "application/json"}
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200:  # and not response.json()['error']:
+                return response.json()
+            elif response.status_code == 404:
+                raise FileNotFoundError(404)
+            elif response.status_code == 500:
+                raise RuntimeError('Server error', response.content)
+        except Exception as e:
+            _LOG.exception(e)
+            raise e
 

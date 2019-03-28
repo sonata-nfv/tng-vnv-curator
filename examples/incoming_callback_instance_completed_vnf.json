@@ -1,0 +1,29 @@
+{
+  "ns_instance_uuid":"e64904e7-c2fe-4ff9-a146-6f5f10f44595",
+  ":NEW:platform_type":"sonata",
+  "functions":[
+    {
+      ":RM:vnfr_id":"39a0a632-707e-4f32-aefb-539f6e334e1d",
+      ":RM:vdu_reference":"default-vnf0:vdu01-39a0a632-707e-4f32-aefb-539f6e334e1d",
+      ":NEW:name":"default-vnf0",
+      ":NEW:function_type":"vnf",
+      "endpoints":[
+        {
+          "id":"mgmt",
+          "type":"internal",
+          "address":"172.16.1.1"
+        },
+        {
+          "id":"internal",
+          "type":"internal",
+          "address":"172.16.1.2"
+        },
+        {
+          "id":"output",
+          "type":"external",
+          "address":"172.16.1.3"
+        }
+      ]
+    }
+  ]
+}

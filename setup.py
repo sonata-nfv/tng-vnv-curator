@@ -93,6 +93,7 @@ setup(
         'six',
         'urllib3',
         'psycopg2',
+        'coloredlogs',
         # 'shutil'
     ],
     setup_requires=['pytest-runner'],

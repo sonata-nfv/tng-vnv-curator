@@ -5,6 +5,9 @@
   "version":"0.1",
   "author":"Ignacio Dominguez, Felipe Vicens (ATOS)",
   "description":"\"Performance test for video analysis\"\n",
+  "test_uuid":"d373696a-1489-4a29-9f7b-e79d8cebbdbb",
+  "service_uuid":"8ec8e3a4-6128-47f3-a545-5defff53a28c",
+  "packet_uuid":"bdf5a734-fa93-47ee-99e5-e7272424f79c",
   "service_platforms":[
     "SONATA"
   ],

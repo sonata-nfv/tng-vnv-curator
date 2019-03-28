@@ -1,0 +1,27 @@
+{
+  "ns_instance_uuid":"e64904e7-c2fe-4ff9-a146-6f5f10f44595",
+  "platform_type":"sonata",
+  "functions":[
+    {
+      "name":"default-cnf0",
+      "function_type":"cnf",
+      "endpoints":[
+        {
+          "id":"floating-ip",
+          "type":"floating-ip",
+          "address":"172.16.1.1",
+          "ports":[
+            {
+              "id":"http",
+              "port":80
+            },
+            {
+              "id":"https",
+              "port":443
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
