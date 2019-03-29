@@ -347,7 +347,7 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
 
 def wait_for_instatiation(platform_adapter, service_platform, service_uuid, period=5, timeout=None):
     """
-
+    Method for waiting for SP to instantiate the service, in case PA has not callback
     :param service_platform:
     :param service_uuid:
     :return:

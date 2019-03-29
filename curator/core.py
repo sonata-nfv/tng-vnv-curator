@@ -172,7 +172,7 @@ def handle_new_test_plan():
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>']),
            methods=['DELETE'])
 def test_plan_cancelled(test_bundle_uuid):
-    app.logger.debug(f'Canceling test_plan ')
+    app.logger.debug(f'Canceling test_plan')
     # _LOG.debug(f'Canceling test_plan ')
     process_thread = Thread(target=cancel_test_plan, args=(request.get_json(), test_bundle_uuid))
     process_thread.start()
@@ -190,7 +190,7 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
     :return:
     """
     # Notify SP setup blocked thread
-    app.logger.debug(f'Callback received, contains {request.get_data()}, '
+    app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                      f'Content-type: {request.headers["Content-type"]}')
     try:
         payload = request.get_json()
@@ -243,6 +243,8 @@ def test_in_execution(test_bundle_uuid):
     :param test_bundle_uuid:
     :return:
     """
+    app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+                     f'Content-type: {request.headers["Content-type"]}')
     try:
         executor_payload = request.get_json()
         test_index = next(
@@ -269,6 +271,8 @@ def test_finished(test_bundle_uuid, test_uuid):
     methods=['POST'])
 def test_cancelled(test_bundle_uuid, test_uuid):
     # Wrap up, notify
+    app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+                     f'Content-type: {request.headers["Content-type"]}')
     payload = request.get_json()
     context['test_preparations'][test_bundle_uuid]['test_results'].append(payload)
     context['events'][test_bundle_uuid][test_uuid].set()
@@ -300,6 +304,9 @@ def get_context():
 def dummy_endpoint():
     if request.method == 'GET':
         app.logger.debug(f'args: {request.args}')
+        app.logger.debug(f'path: {request.path}')
+        app.logger.debug(f'full_path: {request.full_path}')
+        app.logger.debug(f'url: {request.url}')
         return make_response('{"error": null}, {"message": "hello"}', OK, {'Content-Type': 'application/json'})
     elif request.method == 'POST':
         app.logger.debug(f'headers: {request.headers}')
