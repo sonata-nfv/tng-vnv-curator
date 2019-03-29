@@ -174,7 +174,7 @@ def process_test_plan(test_bundle_uuid):
                     ex_response = executor.execution_request(test_descriptor_instance, test_bundle_uuid)
                     (context['test_preparations'][test_bundle_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
-                        ['test_uuid']) = ex_response['test-uuid']
+                        ['test_uuid']) = ex_response['test_uuid']
                     (context['test_preparations'][test_bundle_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'STARTING'

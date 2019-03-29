@@ -63,8 +63,8 @@ class PlannerInterface(Interface):
     def send_callback(self, suffix, test_plan_uuid, results_uuid):
         url = self.__base_url + suffix
         payload = {
-            'test-plan-uuid': test_plan_uuid,
-            'results-uuid': results_uuid,
+            'test_plan_uuid': test_plan_uuid,
+            'results_uuid': results_uuid,
             'status': 'COMPLETED',
         }
         headers = {"Content-type": "application/json"}
