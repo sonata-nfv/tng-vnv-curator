@@ -243,7 +243,7 @@ def clean_environment(test_bundle_uuid, test_id=None, content=None, error=None):
 
     #  Shutdown instance
     pa_response = platform_adapter.nsi_uuid(test_finished[1]['service_platform'], test_finished[1]['nsi_uuid'])
-    if all([d['status'] != 'STARTING' and d['status'] != 'RUNNING'
+    if all([d['test_status'] != 'STARTING' and d['test_status'] != 'RUNNING'
             for d in context['test_preparations'][test_bundle_uuid]['augmented_descriptors']]):
         #  Remove probe images if there are no more instances running on this test plan
         _LOG.debug(f'Test {test_id} was the last for test-plan {test_bundle_uuid}, '
@@ -285,7 +285,7 @@ def cancel_test_plan(test_bundle_uuid, content):
     executor = context['plugin']['executor']
     dockeri = context['plugins']['docker']
     callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
-    for test in [run_test for run_test in context['test_preparations'][test_bundle_uuid]['augmented_descriptors'] if run_test['status'] == 'RUNNING' or run_test['status'] == 'STARTING']:
+    for test in [run_test for run_test in context['test_preparations'][test_bundle_uuid]['augmented_descriptors'] if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
         context['events'][test_bundle_uuid][test['test_uuid']] = threading.Event()
         executor.execution_cancel(test_bundle_uuid, test['test_uuid'])
         context['events'][test_bundle_uuid][test['test_uuid']].wait()

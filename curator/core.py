@@ -252,7 +252,7 @@ def test_in_execution(test_bundle_uuid):
                 enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
                 if d['test_uuid'] == executor_payload['test_uuid']), None)
         (context['test_preparations'][test_bundle_uuid]['augmented_descriptors']
-            [test_index]['status']) = executor_payload['status'] if 'status' in executor_payload.keys() else 'RUNNING'
+            [test_index]['test_status']) = executor_payload['status'] if 'status' in executor_payload.keys() else 'RUNNING'
         return make_response('{}', OK, {'Content-Type': 'application/json'})
     except Exception as e:
         return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
