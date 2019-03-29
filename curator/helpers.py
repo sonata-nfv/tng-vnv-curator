@@ -231,8 +231,12 @@ def clean_environment(test_bundle_uuid, test_id=None, content=None, error=None):
     platform_adapter = context['plugins']['platform_adapter']
     dockeri = context['plugins']['docker']
     planner = context['plugins']['planner']
-    callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
+    try:
+        callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
+    except AttributeError as e:
+        _LOG.exception(e)
     context['test_preparations'][test_bundle_uuid]['test_results'].append(content)
+    context['test_results'].append(content)  # just for debugging
     test_finished = [
         (p_index, augd) for p_index, augd in
         enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
