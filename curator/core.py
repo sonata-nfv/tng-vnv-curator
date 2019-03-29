@@ -348,6 +348,7 @@ def after_request(response):
 def main():
     context['alive_since'] = datetime.utcnow().replace(microsecond=0)
     context['test_preparations'] = {}
+    context['test_results'] = []
     context['host'] = 'tng-vnv-curator:6200'
     padapt_iface = PlatformAdapterInterface(API_ROOT, API_VERSION)
     exec_iface = ExecutorInterface(API_ROOT, API_VERSION)

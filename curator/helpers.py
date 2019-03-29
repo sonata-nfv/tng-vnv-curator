@@ -234,7 +234,8 @@ def clean_environment(test_bundle_uuid, test_id=None, content=None, error=None):
     try:
         callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
     except AttributeError as e:
-        _LOG.exception(e)
+        # _LOG.exception(e)
+        _LOG.error(f'Callbacks: {e} but going forward')
     context['test_preparations'][test_bundle_uuid]['test_results'].append(content)
     context['test_results'].append(content)  # just for debugging
     test_finished = [
@@ -243,10 +244,13 @@ def clean_environment(test_bundle_uuid, test_id=None, content=None, error=None):
         if augd['test_uuid'] == test_id
     ][0]
     (context['test_preparations'][test_bundle_uuid]['augmented_descriptors']
-        [test_finished[0]]['test_status']) = content['status'] if 'status' in content.keys() else 'FINISHED'
+    [test_finished[0]]['test_status']) = content['status'] if 'status' in content.keys() else 'FINISHED'
+
 
     #  Shutdown instance
-    pa_response = platform_adapter.nsi_uuid(test_finished[1]['service_platform'], test_finished[1]['nsi_uuid'])
+    _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]}')
+    pa_response = platform_adapter.shutdown_package(test_finished[1]['service_platform'], test_finished[1]['nsi_uuid'])
+    _LOG.debug(f'Response from PA: {pa_response}')
     if all([d['test_status'] != 'STARTING' and d['test_status'] != 'RUNNING'
             for d in context['test_preparations'][test_bundle_uuid]['augmented_descriptors']]):
         #  Remove probe images if there are no more instances running on this test plan

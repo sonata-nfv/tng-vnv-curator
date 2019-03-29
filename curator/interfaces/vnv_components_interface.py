@@ -239,8 +239,11 @@ class PlatformAdapterInterface(Interface):
         """
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations', service_uuid])
         headers = {"Content-type": "application/json"}
+        _LOG.debug(f'Accesing {url}')
         try:
             response = requests.get(url, headers=headers)
+            _LOG.debug(f'ResContent {response.text}')
+            _LOG.debug(f'ResHeaders {response.headers}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
@@ -372,7 +375,11 @@ class PlatformAdapterInterface(Interface):
         data = {"instance_uuid": instance_uuid, "request_type": "TERMINATE_SERVICE"}
         headers = {"Content-type": "application/json"}
         try:
+            _LOG.debug(f'Accesing {url}')
+            _LOG.debug(f'Payload {data}')
             response = requests.post(url, headers=headers, json=data)
+            _LOG.debug(f'ResContent {response.text}')
+            _LOG.debug(f'ResHeaders {response.headers}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
