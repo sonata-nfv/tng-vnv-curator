@@ -249,10 +249,15 @@ def clean_environment(test_bundle_uuid, test_id=None, content=None, error=None):
         _LOG.debug(f'Test {test_id} was the last for test-plan {test_bundle_uuid}, '
                    f'cleaning up and sending results to planner')
         for probe in context['test_preparations'][test_bundle_uuid]['probes']:
-            dockeri.rm_image(probe['image'])
+            try:
+                _LOG.debug(f'Removing {probe["name"]}')
+                dockeri.rm_image(probe['image'])
+            except Exception as e:
+                _LOG.error(f'Failed removal of {probe["name"]}, reason: {e}')
+
         #  Answer to planner
-        planner_resp = planner.send_callback(callback_path, test_bundle_uuid,
-                                             context['test_preparations'][test_bundle_uuid]['test_results'])
+        # planner_resp = planner.send_callback(callback_path, test_bundle_uuid,
+        #                                      context['test_preparations'][test_bundle_uuid]['test_results'])
         # if planner_resp ok, clean test_preparations entry
         del context['test_preparations'][test_bundle_uuid]
 
