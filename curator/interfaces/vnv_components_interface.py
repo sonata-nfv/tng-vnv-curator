@@ -371,7 +371,9 @@ class PlatformAdapterInterface(Interface):
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
 
     def shutdown_package(self, service_platform, instance_uuid):
-        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        # url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations', 'terminate'])
+
         data = {"instance_uuid": instance_uuid, "request_type": "TERMINATE_SERVICE"}
         headers = {"Content-type": "application/json"}
         try:
