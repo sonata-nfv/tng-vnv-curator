@@ -65,12 +65,16 @@ def process_test_plan(test_bundle_uuid):
     _LOG.debug(f'configuration_phase: {configuration_action}')
     for probe in configuration_action['probes']:
         _LOG.debug(f'Getting {probe["name"]}')
-        # image = dockeri.pull(probe['image'])
+        try:
+            image = dockeri.pull(probe['image'])
+            image_id = image.short_id
+        except Exception as e:
+            _LOG.exception(e)
+            image_id = f'aa-bb-cc-dd-{probe["name"]}'
 
         context['test_preparations'][test_bundle_uuid]['probes'].append(
             {
-                # 'id': image.short_id,
-                'id': 'aa-bb-cc-dd' + probe['name'],
+                'id': image_id,
                 'name': probe['name'],
                 'image': probe['image']
             }
@@ -138,8 +142,19 @@ def process_test_plan(test_bundle_uuid):
                 instantiation_params = [
                     (p_index, augd) for p_index, augd in
                     enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
-                    if augd['platform'] == platform_type.lower()
-                ][0]
+                    if augd['platform_type'] == platform_type.lower() and not augd['error']
+                ]
+                if len(instantiation_params) < 1:
+                    error_params = instantiation_params = [
+                        (p_index, augd) for p_index, augd in
+                        enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
+                        if augd['error'] and augd['nsi_name'] == instance_name
+                    ]
+                    if error_params:
+                        _LOG.error(f'Received error from PA: {error_params}')
+                        # Send callback to planner
+                        raise ValueError(error_params[0])
+
                 test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
                 nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
                 if len(test_cat) == 0:
@@ -149,27 +164,30 @@ def process_test_plan(test_bundle_uuid):
                 try:
                     test_descriptor_instance = generate_test_descriptor_instance(
                         td.copy(),
-                        instantiation_params[1]['functions'],
+                        instantiation_params[0][1]['functions'],
                         test_uuid=test_cat[0]['uuid'],
                         service_uuid=nsd_cat[0]['uuid'],
                         package_uuid=inst_result['package_id'],
-                        instance_uuid=instantiation_params[1]['nsi_uuid']
+                        instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
                     ex_response = executor.execution_request(test_descriptor_instance, test_bundle_uuid)
                     (context['test_preparations'][test_bundle_uuid]
-                        ['augmented_descriptors'][instantiation_params[0]]
-                        ['test_uuid']) = ex_response['test-uuid']
+                        ['augmented_descriptors'][instantiation_params[0][0]]
+                        ['test_uuid']) = ex_response['test_uuid']
                     (context['test_preparations'][test_bundle_uuid]
-                        ['augmented_descriptors'][instantiation_params[0]]
-                        ['test_status']) = ex_response['status']
+                        ['augmented_descriptors'][instantiation_params[0][0]]
+                        ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'STARTING'
                     (context['test_preparations'][test_bundle_uuid]
-                        ['augmented_descriptors'][instantiation_params[0]]
-                        ['service_platform']) = service_platform
+                        ['augmented_descriptors'][instantiation_params[0][0]]
+                        ['platform']) = service_platform
                     del context['events'][test_bundle_uuid][instance_name]
                     _LOG.debug(f'Response from executor: {ex_response}')
                 except Exception as e:
                     _LOG.exception(f'Something happened... {e}')
+                    # Call cleanup for which was deployed if there are no more tests running,
+                    # log the error
+
 
                 # # Wait for executor callback (?)
                 # context['events'][instance_name].set()
@@ -208,33 +226,46 @@ def process_test_plan(test_bundle_uuid):
     # LOG.debug('completed ' + test_plan)
 
 
-def clean_environment(test_bundle_uuid, test_id, content):
+def clean_environment(test_bundle_uuid, test_id=None, content=None, error=None):
     _LOG.info(f'Test {test_id} from test-plan {test_bundle_uuid} finished')
     platform_adapter = context['plugins']['platform_adapter']
     dockeri = context['plugins']['docker']
     planner = context['plugins']['planner']
-    callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
+    try:
+        callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
+    except AttributeError as e:
+        # _LOG.exception(e)
+        _LOG.error(f'Callbacks: {e} but going forward')
     context['test_preparations'][test_bundle_uuid]['test_results'].append(content)
+    context['test_results'].append(content)  # just for debugging
     test_finished = [
         (p_index, augd) for p_index, augd in
         enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
         if augd['test_uuid'] == test_id
     ][0]
     (context['test_preparations'][test_bundle_uuid]['augmented_descriptors']
-        [test_finished[0]]['test_status']) = content['status']
+    [test_finished[0]]['test_status']) = content['status'] if 'status' in content.keys() else 'FINISHED'
+
 
     #  Shutdown instance
-    pa_response = platform_adapter.nsi_uuid(test_finished[1]['service_platform'], test_finished[1]['nsi_uuid'])
-    if all([d['status'] != 'STARTING' and d['status'] != 'RUNNING'
+    _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform_type"]}')
+    pa_response = platform_adapter.shutdown_package(test_finished[1]['platform_type'], test_finished[1]['nsi_uuid'])
+    _LOG.debug(f'Response from PA: {pa_response}')
+    if all([d['test_status'] != 'STARTING' and d['test_status'] != 'RUNNING'
             for d in context['test_preparations'][test_bundle_uuid]['augmented_descriptors']]):
         #  Remove probe images if there are no more instances running on this test plan
         _LOG.debug(f'Test {test_id} was the last for test-plan {test_bundle_uuid}, '
                    f'cleaning up and sending results to planner')
         for probe in context['test_preparations'][test_bundle_uuid]['probes']:
-            dockeri.rm_image(probe['image'])
+            try:
+                _LOG.debug(f'Removing {probe["name"]}')
+                dockeri.rm_image(probe['image'])
+            except Exception as e:
+                _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
+
         #  Answer to planner
-        planner_resp = planner.send_callback(callback_path, test_bundle_uuid,
-                                             context['test_preparations'][test_bundle_uuid]['test_results'])
+        # planner_resp = planner.send_callback(callback_path, test_bundle_uuid,
+        #                                      context['test_preparations'][test_bundle_uuid]['test_results'])
         # if planner_resp ok, clean test_preparations entry
         del context['test_preparations'][test_bundle_uuid]
 
@@ -262,7 +293,7 @@ def cancel_test_plan(test_bundle_uuid, content):
     executor = context['plugin']['executor']
     dockeri = context['plugins']['docker']
     callback_path = context['test_preparations'][test_bundle_uuid]['paths'].keys()[0]
-    for test in [run_test for run_test in context['test_preparations'][test_bundle_uuid]['augmented_descriptors'] if run_test['status'] == 'RUNNING' or run_test['status'] == 'STARTING']:
+    for test in [run_test for run_test in context['test_preparations'][test_bundle_uuid]['augmented_descriptors'] if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
         context['events'][test_bundle_uuid][test['test_uuid']] = threading.Event()
         executor.execution_cancel(test_bundle_uuid, test['test_uuid'])
         context['events'][test_bundle_uuid][test['test_uuid']].wait()
@@ -312,9 +343,8 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
                     for parameter in instantiation_parameters:
                         if parameter['name'] == path[0]:
                             value = route_from_text(parameter, path[1:])
-                            (test_descriptor['phases'][setup_phase[0]]
-                                ['steps'][configuration_action[0]]
-                                ['probes'][i]['value']) = value
+                            probe_param['value'] = value
+    # TODO: warn or error when there are expected parameters that are missing
     test_descriptor['test_descriptor_uuid'] = test_uuid
     test_descriptor['package_descriptor_uuid'] = package_uuid
     test_descriptor['network_service_descriptor_uuid'] = service_uuid
@@ -325,7 +355,7 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
 
 def wait_for_instatiation(platform_adapter, service_platform, service_uuid, period=5, timeout=None):
     """
-
+    Method for waiting for SP to instantiate the service, in case PA has not callback
     :param service_platform:
     :param service_uuid:
     :return:
@@ -347,17 +377,17 @@ def route_from_text(obj, route):
     :param route:
     :return:
     """
-    # _LOG.debug(f'Looking for {route} in {obj}')
+    _LOG.debug(f'Looking for {route} in {obj}')
     if len(route) > 1 and ':' in route[0]:
-        # _LOG.debug('Is a dictionary nested inside a list')
+        _LOG.debug('Is a dictionary nested inside a list')
         res = [d for d in obj if d[route[0].split(':')[0]] == route[0].split(':')[1]][0]
         tail = route_from_text(res, route[1:])
     elif len(route) > 1 and ':' not in route[0]:
-        # _LOG.debug('Is a dictionary nested inside a dictionary')
+        _LOG.debug('Is a dictionary nested inside a dictionary')
         res = obj[route[0]]
         tail = route_from_text(res, route[1:])
     elif len(route) == 1:
-        # _LOG.debug('Is an object')
+        _LOG.debug('Is an object')
         tail = obj[route[0]]
     else:
         raise ValueError(obj, route)

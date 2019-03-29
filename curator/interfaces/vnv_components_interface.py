@@ -28,6 +28,7 @@
 import os
 import requests
 import logging
+import json
 from curator.interfaces.interface import Interface
 from curator.database import context
 from curator.logger import TangoLogger
@@ -62,8 +63,8 @@ class PlannerInterface(Interface):
     def send_callback(self, suffix, test_plan_uuid, results_uuid):
         url = self.__base_url + suffix
         payload = {
-            'test-plan-uuid': test_plan_uuid,
-            'results-uuid': results_uuid,
+            'test_plan_uuid': test_plan_uuid,
+            'results_uuid': results_uuid,
             'status': 'COMPLETED',
         }
         headers = {"Content-type": "application/json"}
@@ -238,8 +239,11 @@ class PlatformAdapterInterface(Interface):
         """
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations', service_uuid])
         headers = {"Content-type": "application/json"}
+        _LOG.debug(f'Accesing {url}')
         try:
             response = requests.get(url, headers=headers)
+            _LOG.debug(f'ResContent {response.text}')
+            _LOG.debug(f'ResHeaders {response.headers}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
@@ -367,11 +371,17 @@ class PlatformAdapterInterface(Interface):
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
 
     def shutdown_package(self, service_platform, instance_uuid):
-        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        # url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations', 'terminate'])
+
         data = {"instance_uuid": instance_uuid, "request_type": "TERMINATE_SERVICE"}
         headers = {"Content-type": "application/json"}
         try:
+            _LOG.debug(f'Accesing {url}')
+            _LOG.debug(f'Payload {data}')
             response = requests.post(url, headers=headers, json=data)
+            _LOG.debug(f'ResContent {response.text}')
+            _LOG.debug(f'ResHeaders {response.headers}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
@@ -427,6 +437,8 @@ class ExecutorInterface(Interface):
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
         self.base_url = os.getenv('executor_base')
+        self.version = 'v1'
+        self.api = 'api'
         self.events = []
 
     def execution_request(self, tdi, test_plan_uuid):
@@ -460,14 +472,21 @@ class ExecutorInterface(Interface):
                 }
             ]
         }
-        url = '/'.join([self.base_url, 'test-executions'])
+        url = '/'.join([self.base_url, self.api, self.version, 'test-executions'])
         headers = {"Content-type": "application/json"}
+        _LOG.debug(f'Sending to executor {url} with payload {json.dumps(data)}')
+
         try:
             response = requests.post(url, headers=headers, json=data)
-            if response.status_code == 200:  # and not response.json()['error']:
+            _LOG.debug(f'Rstatus: {response.status_code}')
+            _LOG.debug(f'Rdata: {response.content}')
+            _LOG.debug(f'RESPONSE decoded: {response.json()}')
+            if response.status_code == 202:  # and not response.json()['error']:
                 return response.json()
             elif response.status_code == 404:
-                raise FileNotFoundError
+                raise FileNotFoundError(response.json())
+            else:
+                raise ValueError(f'Code not expected, {response.content}, status={response.status_code}')
         except Exception as e:
             _LOG.exception(e)
             raise e
@@ -483,16 +502,20 @@ class ExecutorInterface(Interface):
                 }
             ]
         }
-        url = '/'.join([self.base_url, 'test-executions', test_uuid, 'cancel'])
+        url = '/'.join([self.base_url, self.api, self.version, 'test-executions', test_uuid, 'cancel'])
         headers = {"Content-type": "application/json"}
         try:
             response = requests.post(url, headers=headers, json=data)
+            _LOG.debug(f'Rstatus: {response.status_code}')
+            _LOG.debug(f'Rdata: {response.raw}')
             if response.status_code == 200:  # and not response.json()['error']:
                 return response.json()
             elif response.status_code == 404:
-                raise FileNotFoundError(404)
+                raise FileNotFoundError(response.json())
             elif response.status_code == 500:
-                raise RuntimeError('Server error', response.content)
+                raise RuntimeError('Server error ', response.content)
+            else:
+                raise ValueError(f'Code not expected, {response.content}, status={response.status_code}')
         except Exception as e:
             _LOG.exception(e)
             raise e
