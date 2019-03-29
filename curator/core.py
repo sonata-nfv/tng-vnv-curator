@@ -205,7 +205,7 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
                 {
                     'nsi_uuid': payload['ns_instance_uuid'],
                     'nsi_name': instance_name,
-                    'platform': payload['platform_type'],
+                    'platform_type': payload['platform_type'],
                     'functions': payload['functions'],
                     'error': None
                 }
@@ -216,7 +216,7 @@ def prepare_environment_callback(test_bundle_uuid, instance_name):
             context['test_preparations'][test_bundle_uuid]['augmented_descriptors'].append(
                 {
                     'nsi_uuid': None,
-                    'platform': 'unknown',
+                    'platform_type': 'unknown',
                     'functions': None,
                     'nsi_name': instance_name,
                     'error': payload['error']

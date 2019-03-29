@@ -142,7 +142,7 @@ def process_test_plan(test_bundle_uuid):
                 instantiation_params = [
                     (p_index, augd) for p_index, augd in
                     enumerate(context['test_preparations'][test_bundle_uuid]['augmented_descriptors'])
-                    if augd['platform'] == platform_type.lower() and not augd['error']
+                    if augd['platform_type'] == platform_type.lower() and not augd['error']
                 ]
                 if len(instantiation_params) < 1:
                     error_params = instantiation_params = [
@@ -180,7 +180,7 @@ def process_test_plan(test_bundle_uuid):
                         ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'STARTING'
                     (context['test_preparations'][test_bundle_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
-                        ['service_platform']) = service_platform
+                        ['platform']) = service_platform
                     del context['events'][test_bundle_uuid][instance_name]
                     _LOG.debug(f'Response from executor: {ex_response}')
                 except Exception as e:
@@ -248,8 +248,8 @@ def clean_environment(test_bundle_uuid, test_id=None, content=None, error=None):
 
 
     #  Shutdown instance
-    _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]}')
-    pa_response = platform_adapter.shutdown_package(test_finished[1]['service_platform'], test_finished[1]['nsi_uuid'])
+    _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform_type"]}')
+    pa_response = platform_adapter.shutdown_package(test_finished[1]['platform_type'], test_finished[1]['nsi_uuid'])
     _LOG.debug(f'Response from PA: {pa_response}')
     if all([d['test_status'] != 'STARTING' and d['test_status'] != 'RUNNING'
             for d in context['test_preparations'][test_bundle_uuid]['augmented_descriptors']]):
