@@ -177,7 +177,7 @@ def process_test_plan(test_bundle_uuid):
                         ['test_uuid']) = ex_response['test-uuid']
                     (context['test_preparations'][test_bundle_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
-                        ['test_status']) = ex_response['status']
+                        ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'STARTING'
                     (context['test_preparations'][test_bundle_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['service_platform']) = service_platform
@@ -239,7 +239,7 @@ def clean_environment(test_bundle_uuid, test_id=None, content=None, error=None):
         if augd['test_uuid'] == test_id
     ][0]
     (context['test_preparations'][test_bundle_uuid]['augmented_descriptors']
-        [test_finished[0]]['test_status']) = content['status']
+        [test_finished[0]]['test_status']) = content['status'] if 'status' in content.keys() else 'FINISHED'
 
     #  Shutdown instance
     pa_response = platform_adapter.nsi_uuid(test_finished[1]['service_platform'], test_finished[1]['nsi_uuid'])
