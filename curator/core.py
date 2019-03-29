@@ -262,7 +262,14 @@ def test_in_execution(test_bundle_uuid):
     ['', API_ROOT, API_VERSION, 'test-preparations', '<test_bundle_uuid>', 'tests', '<test_uuid>', 'finish']),
     methods=['POST'])
 def test_finished(test_bundle_uuid, test_uuid):
-    process_thread = Thread(target=clean_environment, args=(test_bundle_uuid, test_uuid, request.get_json(),))
+    try:
+        app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+                         f'Content-type: {request.headers["Content-type"]}')
+        process_thread = Thread(target=clean_environment, args=(test_bundle_uuid, test_uuid, request.get_json(),))
+        process_thread.start()
+        context['threads'].append(process_thread)
+    except Exception as e:
+        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 
