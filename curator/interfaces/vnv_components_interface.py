@@ -469,11 +469,15 @@ class ExecutorInterface(Interface):
 
         try:
             response = requests.post(url, headers=headers, json=data)
-            _LOG.debug(f'RESPONSE: {response.json()}')
-            if response.status_code == 200:  # and not response.json()['error']:
+            _LOG.debug(f'Rstatus: {response.status_code}')
+            _LOG.debug(f'Rdata: {response.content}')
+            _LOG.debug(f'RESPONSE decoded: {response.json()}')
+            if response.status_code == 202:  # and not response.json()['error']:
                 return response.json()
             elif response.status_code == 404:
-                raise FileNotFoundError
+                raise FileNotFoundError(response.json())
+            else:
+                raise ValueError(f'Code not expected, {response.content}, status={response.status_code}')
         except Exception as e:
             _LOG.exception(e)
             raise e
@@ -493,12 +497,16 @@ class ExecutorInterface(Interface):
         headers = {"Content-type": "application/json"}
         try:
             response = requests.post(url, headers=headers, json=data)
+            _LOG.debug(f'Rstatus: {response.status_code}')
+            _LOG.debug(f'Rdata: {response.raw}')
             if response.status_code == 200:  # and not response.json()['error']:
                 return response.json()
             elif response.status_code == 404:
-                raise FileNotFoundError(404)
+                raise FileNotFoundError(response.json())
             elif response.status_code == 500:
-                raise RuntimeError('Server error', response.content)
+                raise RuntimeError('Server error ', response.content)
+            else:
+                raise ValueError(f'Code not expected, {response.content}, status={response.status_code}')
         except Exception as e:
             _LOG.exception(e)
             raise e
