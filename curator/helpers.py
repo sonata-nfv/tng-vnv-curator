@@ -174,6 +174,9 @@ def process_test_plan(test_plan_uuid):
                         instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
+                    (context['test_preparations'][test_plan_uuid]
+                        ['augmented_descriptors'][instantiation_params[0][0]]
+                        ['tdi']) = test_descriptor_instance
                     ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
@@ -188,7 +191,7 @@ def process_test_plan(test_plan_uuid):
                     _LOG.debug(f'Response from executor: {ex_response}')
                 except Exception as e:
                     tb = "".join(traceback.format_exc().split("\n"))
-                    _LOG.error(f'Something happened... {tb}')
+                    _LOG.error(f'Error during instantiation or execution:  {tb}')
                     # Call cleanup for which was deployed if there are no more tests running,
                     # log the error
 
@@ -240,6 +243,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
     except AttributeError as e:
         # _LOG.exception(e)
         _LOG.error(f'Callbacks: {e} but going forward')
+        callback_path = ''
     context['test_preparations'][test_plan_uuid]['test_results'].append(content)
     context['test_results'].append(content)  # just for debugging
     test_finished = [
@@ -253,8 +257,16 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
 
     #  Shutdown instance
     _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform_type"]}')
-    pa_response = platform_adapter.shutdown_package(test_finished[1]['platform_type'], test_finished[1]['nsi_uuid'])
-    _LOG.debug(f'Response from PA: {pa_response}')
+    pa_termination_response = platform_adapter.shutdown_package(
+        test_finished[1]['platform_type'],
+        test_finished[1]['nsi_uuid'])
+    _LOG.debug(f'Termination response from PA: {pa_termination_response}')
+    # pa_package_removal_response = platform_adapter.delete_package(
+    #     test_finished[1]['platform_type'],
+    #     test_finished[1]['tdi']['package_uuid']
+    #     'p_name'
+    # )
+    # TODO: remove package from SP
     if all([d['test_status'] != 'STARTING' and d['test_status'] != 'RUNNING'
             for d in context['test_preparations'][test_plan_uuid]['augmented_descriptors']]):
         #  Remove probe images if there are no more instances running on this test plan
@@ -268,8 +280,9 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
                 _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
 
         #  Answer to planner
-        # planner_resp = planner.send_callback(callback_path, test_plan_uuid,
-        #                                      context['test_preparations'][test_plan_uuid]['test_results'])
+        res_list = [{'test_results_uuid': d['test_results_uuid'], 'test_status': d['test_status']} for d in context['test_preparations'][test_plan_uuid]['test_results']]
+        planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list)
+        _LOG.debug(f'Response from planner: {planner_resp}')
         # if planner_resp ok, clean test_preparations entry
         del context['test_preparations'][test_plan_uuid]
 

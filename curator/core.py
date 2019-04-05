@@ -133,6 +133,9 @@ def handle_new_test_plan():
             # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
             # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
             context['test_preparations'][new_uuid] = payload  # Should have
+            create_time = datetime.utcnow().replace(microsecond=0)
+            context['test_preparations'][new_uuid]['created_at'] = create_time
+            context['test_preparations'][new_uuid]['updated_at'] = create_time
             process_thread = Thread(target=process_test_plan, args=(new_uuid,))
             process_thread.start()
             context['threads'].append(process_thread)
@@ -153,6 +156,7 @@ def handle_new_test_plan():
 def test_plan_cancelled(test_plan_uuid):
     app.logger.debug(f'Canceling test_plan')
     # _LOG.debug(f'Canceling test_plan ')
+    context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
     process_thread = Thread(target=cancel_test_plan, args=(request.get_json(), test_plan_uuid))
     process_thread.start()
     context['threads'].append(process_thread)
@@ -174,6 +178,7 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
                      f'Content-type: {request.headers["Content-type"]}')
     try:
         payload = request.get_json()
+        context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         # payload = json.loads(request.get_data().decode("UTF-8"))
         # _LOG.debug(f'Callback received, contains {payload}')
         app.logger.debug(f'Callback received, contains {payload}')
@@ -227,6 +232,7 @@ def test_in_execution(test_plan_uuid):
                      f'Content-type: {request.headers["Content-type"]}')
     try:
         executor_payload = request.get_json()
+        context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         test_index = next(
             (index for (index, d) in
                 enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
@@ -246,6 +252,7 @@ def test_finished(test_plan_uuid, test_uuid):
     try:
         app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                          f'Content-type: {request.headers["Content-type"]}')
+        context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, request.get_json(),))
         process_thread.start()
         context['threads'].append(process_thread)
@@ -262,6 +269,7 @@ def test_cancelled(test_plan_uuid, test_uuid):
     app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                      f'Content-type: {request.headers["Content-type"]}')
     payload = request.get_json()
+    context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
     context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
     context['events'][test_plan_uuid][test_uuid].set()
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
@@ -278,7 +286,7 @@ def test_cancelled(test_plan_uuid, test_uuid):
 
 #  Utils
 
-@app.route('/'.join(['', API_ROOT, API_VERSION, 'context']),methods=['GET'])
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'context']), methods=['GET'])
 def get_context():
     f_context = {k: context[k] for k in context.keys() if k != 'plugins' and k != 'threads' and k != 'events'}
     return make_response(
@@ -329,6 +337,7 @@ def after_request(response):
                     f' {request.full_path} {response.status} {response.content_length}')
     response.headers.add('X-REQUEST-ID', current_request_id())
     return response
+
 
 def main():
     context['alive_since'] = datetime.utcnow().replace(microsecond=0)
