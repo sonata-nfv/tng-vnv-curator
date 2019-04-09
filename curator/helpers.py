@@ -239,7 +239,10 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
     dockeri = context['plugins']['docker']
     planner = context['plugins']['planner']
     try:
-        callback_path = context['test_preparations'][test_plan_uuid]['paths'].keys()[0]
+        callback_path = [
+            d['url'] for d in context['test_preparations'][test_plan_uuid]['paths']
+            if d['status'] == 'COMPLETED'
+        ][0]
     except AttributeError as e:
         # _LOG.exception(e)
         _LOG.error(f'Callbacks: {e} but going forward')
@@ -281,7 +284,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
 
         #  Answer to planner
         res_list = [{'test_results_uuid': d['test_results_uuid'], 'test_status': d['test_status']} for d in context['test_preparations'][test_plan_uuid]['test_results']]
-        planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list)
+        planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='COMPLETED')
         _LOG.debug(f'Response from planner: {planner_resp}')
         # if planner_resp ok, clean test_preparations entry
         del context['test_preparations'][test_plan_uuid]
@@ -322,7 +325,9 @@ def cancel_test_plan(test_plan_uuid, content):
         dockeri.rm_image(probe['image'])
         #  Answer to planner
     planner_resp = planner.send_callback(callback_path, test_plan_uuid,
-                                         context['test_preparations'][test_plan_uuid]['test_results'])
+                                         context['test_preparations'][test_plan_uuid]['test_results'],
+                                         status='CANCELLED'
+                                         )
     # if planner_resp ok, clean test_preparations entry
 
     del context['test_preparations'][test_plan_uuid]
