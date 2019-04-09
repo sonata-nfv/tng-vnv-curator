@@ -46,8 +46,8 @@ _LOG = logging.getLogger('flask.app')
 def process_test_plan(test_plan_uuid):
     _LOG.info(f'Processing {test_plan_uuid}')
     # test_plan contains NSD and TD
-    td = context['test_preparations'][test_plan_uuid]['test_descriptor']
-    nsd = context['test_preparations'][test_plan_uuid]['network_service_descriptor']
+    td = context['test_preparations'][test_plan_uuid]['testd']
+    nsd = context['test_preparations'][test_plan_uuid]['nsd']
     context['test_preparations'][test_plan_uuid]['augmented_descriptors'] = []
     context['test_preparations'][test_plan_uuid]['test_results'] = []
     context['events'][test_plan_uuid] = {}
@@ -240,7 +240,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
     planner = context['plugins']['planner']
     try:
         callback_path = [
-            d['url'] for d in context['test_preparations'][test_plan_uuid]['paths']
+            d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
             if d['status'] == 'COMPLETED'
         ][0]
     except AttributeError as e:
@@ -283,7 +283,14 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
                 _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
 
         #  Answer to planner
-        res_list = [{'test_results_uuid': d['test_results_uuid'], 'test_status': d['test_status']} for d in context['test_preparations'][test_plan_uuid]['test_results']]
+        res_list = [
+            {
+                'test_uuid': d['test_uuid'],
+                'test_results_uuid': d['test_results_uuid'],
+                'test_status': d['test_status']
+            }
+            for d in context['test_preparations'][test_plan_uuid]['test_results']
+        ]
         planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='COMPLETED')
         _LOG.debug(f'Response from planner: {planner_resp}')
         # if planner_resp ok, clean test_preparations entry
@@ -312,7 +319,7 @@ def cancel_test_plan(test_plan_uuid, content):
     planner = context['plugin']['planner']
     executor = context['plugin']['executor']
     dockeri = context['plugins']['docker']
-    callback_path = context['test_preparations'][test_plan_uuid]['paths'].keys()[0]
+    callback_path = context['test_preparations'][test_plan_uuid]['test_plan_callbacks'][1]['url']  #FIXME
     for test in [run_test for run_test in context['test_preparations'][test_plan_uuid]['augmented_descriptors'] if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
         context['events'][test_plan_uuid][test['test_uuid']] = threading.Event()
         executor.execution_cancel(test_plan_uuid, test['test_uuid'])

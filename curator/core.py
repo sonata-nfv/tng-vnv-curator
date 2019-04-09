@@ -131,26 +131,30 @@ def handle_new_test_plan():
         try:
             payload = request.get_json()
             app.logger.debug(f'Received JSON: {payload}')
-            # _LOG.debug(f'Received JSON: {payload}')
-            # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
-            # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
-            context['test_preparations'][new_uuid] = payload  # Should have
-            create_time = datetime.utcnow().replace(microsecond=0)
-            context['test_preparations'][new_uuid]['created_at'] = create_time
-            context['test_preparations'][new_uuid]['updated_at'] = create_time
-            process_thread = Thread(target=process_test_plan, args=(new_uuid,))
-            process_thread.start()
-            context['threads'].append(process_thread)
-            return make_response(json.dumps({'test_plan_uuid': new_uuid, 'status': 'STARTING'}),
-                                 CREATED, {'Content-Type': 'application/json'})
-            # else:
-            #     return make_response(
-            #         json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
-            #         BAD_REQUEST,
-            #         {'Content-Type': 'application/json'}
-            #     )
+            mandatory_keys = {'nsd', 'testd', 'last_test', 'test_plan_callbacks'}
+            if all(key in payload.keys() for key in mandatory_keys):
+                # _LOG.debug(f'Received JSON: {payload}')
+                # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
+                # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
+                context['test_preparations'][new_uuid] = payload  # Should have
+                create_time = datetime.utcnow().replace(microsecond=0)
+                context['test_preparations'][new_uuid]['created_at'] = create_time
+                context['test_preparations'][new_uuid]['updated_at'] = create_time
+                process_thread = Thread(target=process_test_plan, args=(new_uuid,))
+                process_thread.start()
+                context['threads'].append(process_thread)
+                return make_response(json.dumps({'test_plan_uuid': new_uuid, 'status': 'STARTING'}),
+                                     CREATED, {'Content-Type': 'application/json'})
+                # else:
+                #     return make_response(
+                #         json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
+                #         BAD_REQUEST,
+                #         {'Content-Type': 'application/json'}
+                #     )
+            else:
+                raise KeyError(f'Missing keys, mandatory fields are {mandatory_keys}')
         except Exception as e:
-            return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
+            return make_response(json.dumps({'exception': e, 'status': 'ERROR'}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_plan_uuid>']),
@@ -255,7 +259,7 @@ def test_finished(test_plan_uuid, test_uuid):
         app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                          f'Content-type: {request.headers["Content-type"]}')
         context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
-        process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, request.get_json(),))
+        process_thread = Thread(target=clean_evironment, args=(test_plan_uuid, test_uuid, request.get_json(),))
         process_thread.start()
         context['threads'].append(process_thread)
     except Exception as e:
