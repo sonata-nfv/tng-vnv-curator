@@ -166,7 +166,7 @@ def test_plan_cancelled(test_plan_uuid):
     process_thread = Thread(target=cancel_test_plan, args=(request.get_json(), test_plan_uuid))
     process_thread.start()
     context['threads'].append(process_thread)
-    return make_response('{"error": null}', ACCEPTED, {'Content-Type': 'application/json'})
+    return make_response('{"error": null, "status": "CANCELLING"}', ACCEPTED, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_plan_uuid>', 'service-instances',
@@ -221,7 +221,7 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
                 {'Content-Type': 'application/json'}
             )
     except Exception as e:
-        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
+        return make_response(json.dumps({'exception': e.args}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_plan_uuid>', 'change']),
@@ -259,7 +259,7 @@ def test_finished(test_plan_uuid, test_uuid):
         app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                          f'Content-type: {request.headers["Content-type"]}')
         context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
-        process_thread = Thread(target=clean_evironment, args=(test_plan_uuid, test_uuid, request.get_json(),))
+        process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, request.get_json(),))
         process_thread.start()
         context['threads'].append(process_thread)
     except Exception as e:
@@ -300,6 +300,17 @@ def get_context():
         OK,
         {'Content-Type': 'application/json'}
     )
+
+
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'config', 'mock']), methods=['POST'])
+def configure_mock():
+    payload = request.get_json()
+    if 'mock_platform_adapter' in payload.keys() and payload['mock_platform_adapter']:
+        pass # do mock PA
+    if 'mock_executor' in payload.keys() and payload['mock_executor']:
+        pass  # do mock X
+    if 'mock_planner' in payload.keys() and payload['mock_planner']:
+        pass  # do mock P
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'debugger']),methods=['GET', 'POST'])
