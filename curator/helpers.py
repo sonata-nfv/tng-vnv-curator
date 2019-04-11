@@ -75,7 +75,7 @@ def process_test_plan(test_plan_uuid):
 
         context['test_preparations'][test_plan_uuid]['probes'].append(
             {
-                'id': image_id,
+                'id': str(image_id).split(':')[1],
                 'name': probe['name'],
                 'image': probe['image']
             }
@@ -258,6 +258,7 @@ def process_test_plan(test_plan_uuid):
 
 def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
     _LOG.info(f'Test {test_id} from test-plan {test_plan_uuid} finished')
+    _LOG.debug(f'Callback content: {content}')
     platform_adapter = context['plugins']['platform_adapter']
     dockeri = context['plugins']['docker']
     planner = context['plugins']['planner']
@@ -270,7 +271,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
         # _LOG.exception(e)
         _LOG.error(f'Callbacks: {e} but going forward')
         callback_path = ''
-    if not error:
+    if not error and content:
         context['test_preparations'][test_plan_uuid]['test_results'].append(content)
         context['test_results'].append(content)  # just for debugging
         test_finished = [
@@ -279,7 +280,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
             if augd['test_uuid'] == test_id
         ][0]
         (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-        [test_finished[0]]['test_status']) = content['status'] if 'status' in content.keys() else 'FINISHED'
+            [test_finished[0]]['test_status']) = content['status'] if 'status' in content.keys() else 'FINISHED'
 
 
         #  Shutdown instance
@@ -294,6 +295,8 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
         #     'p_name'
         # )
         # TODO: remove package from SP
+    elif error:
+        pass
     if all([d['test_status'] != 'STARTING' and d['test_status'] != 'RUNNING'
             for d in context['test_preparations'][test_plan_uuid]['augmented_descriptors']]):
         #  Remove probe images if there are no more instances running on this test plan
@@ -313,7 +316,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
                 'test_results_uuid': d['test_results_uuid'],
                 'test_status': d['test_status']
             }
-            for d in context['test_preparations'][test_plan_uuid]['test_results']
+            for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
         ]
         planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='COMPLETED')
         _LOG.debug(f'Response from planner: {planner_resp}')

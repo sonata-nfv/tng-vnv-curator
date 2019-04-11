@@ -60,17 +60,22 @@ class PlannerInterface(Interface):
     def add_new_test_plan(self, test_plan_uuid):
         self.__running_test_plans.append(test_plan_uuid)
 
-    def send_callback(self, suffix, test_plan_uuid, result_list, status='UNKNOWN'):
+    def send_callback(self, suffix, test_plan_uuid, result_list, status='UNKNOWN', event_actor='Curator'):
         url = self.__base_url + suffix
         payload = {
-            'event_actor': 'Curator',
+            'event_actor': event_actor,
             'test_plan_uuid': test_plan_uuid,
             'status': status,
             'test_results': result_list
         }
         headers = {"Content-type": "application/json"}
+
+        _LOG.debug(f'Accesing {url}')
+        _LOG.debug(f'Payload {payload}')
         try:
             r = requests.post(url, headers=headers, json=payload)
+            _LOG.debug(f'ResContent {r.text}'.replace('\n', ' '))
+            _LOG.debug(f'ResHeaders {r.headers}')
             resp = r.json()  # Response should be None
         except Exception as e:
             resp = {'error': str(e), 'content': None}
