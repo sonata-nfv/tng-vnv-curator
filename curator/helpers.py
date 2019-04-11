@@ -296,7 +296,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
         # )
         # TODO: remove package from SP
     elif error:
-        pass
+
     if all([d['test_status'] != 'STARTING' and d['test_status'] != 'RUNNING'
             for d in context['test_preparations'][test_plan_uuid]['augmented_descriptors']]):
         #  Remove probe images if there are no more instances running on this test plan
@@ -314,8 +314,8 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
             res_list = [
                 {
                     'test_uuid': d['test_uuid'],
-                    'test_results_uuid': d['test_results_uuid'],
-                    'test_status': d['test_status']
+                    'test_results_uuid': d['results_uuid'],
+                    'test_status': d['status']
                 }
                 for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
             ]
@@ -326,9 +326,10 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
             del context['test_preparations'][test_plan_uuid]
         except Exception as e:
             tb = "".join(traceback.format_exc().split("\n"))
-            _LOG.error(f'Error during test execution: {tb}')
+            _LOG.error(f'Error during test_results recovery: {tb}')
             planner_resp = planner.send_callback(callback_path, test_plan_uuid, [], status='ERROR')
             _LOG.debug(f'Response from planner: {planner_resp}')
+
 
 
 def test_status_update(test_plan_uuid, test_id, content):
