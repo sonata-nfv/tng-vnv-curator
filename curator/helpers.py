@@ -296,7 +296,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
         # )
         # TODO: remove package from SP
     elif error:
-
+        pass
     if all([d['test_status'] != 'STARTING' and d['test_status'] != 'RUNNING'
             for d in context['test_preparations'][test_plan_uuid]['augmented_descriptors']]):
         #  Remove probe images if there are no more instances running on this test plan
