@@ -241,8 +241,11 @@ def process_test_plan(test_plan_uuid):
             # _LOG.exception(e)
             _LOG.error(f'Callbacks: {e} but going fallback to /test-plans/on-change/completed')
             planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR')
+
     if not context['test_preparations'][test_plan_uuid]['augmented_descriptors']:
         # No correct test executions, sendind callback
+        _LOG.warning(f'Curator was not able to setup any of the test environments for {test_plan_uuid}, '
+                     f'sending callback to planner')
         try:
             callback_path = [
                 d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
@@ -329,7 +332,6 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
             _LOG.error(f'Error during test_results recovery: {tb}')
             planner_resp = planner.send_callback(callback_path, test_plan_uuid, [], status='ERROR')
             _LOG.debug(f'Response from planner: {planner_resp}')
-
 
 
 def test_status_update(test_plan_uuid, test_id, content):
