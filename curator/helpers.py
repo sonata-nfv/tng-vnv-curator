@@ -194,7 +194,7 @@ def process_test_plan(test_plan_uuid):
 
                 except Exception as e:
                     tb = "".join(traceback.format_exc().split("\n"))
-                    _LOG.error(f'Error during test execution:  {tb}')
+                    _LOG.error(f'Error during test execution: {tb}')
                     context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]['test_status'] = 'ERROR'
                 # # Wait for executor callback (?)
                 # context['events'][instance_name].set()
@@ -310,18 +310,25 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
                 _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
 
         #  Answer to planner
-        res_list = [
-            {
-                'test_uuid': d['test_uuid'],
-                'test_results_uuid': d['test_results_uuid'],
-                'test_status': d['test_status']
-            }
-            for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
-        ]
-        planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='COMPLETED')
-        _LOG.debug(f'Response from planner: {planner_resp}')
-        # if planner_resp ok, clean test_preparations entry
-        del context['test_preparations'][test_plan_uuid]
+        try:
+            res_list = [
+                {
+                    'test_uuid': d['test_uuid'],
+                    'test_results_uuid': d['test_results_uuid'],
+                    'test_status': d['test_status']
+                }
+                for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
+            ]
+            _LOG.debug(f'results for test_plan #{test_plan_uuid}: {res_list}')
+            planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='COMPLETED')
+            _LOG.debug(f'Response from planner: {planner_resp}')
+            # if planner_resp ok, clean test_preparations entry
+            del context['test_preparations'][test_plan_uuid]
+        except Exception as e:
+            tb = "".join(traceback.format_exc().split("\n"))
+            _LOG.error(f'Error during test execution: {tb}')
+            planner_resp = planner.send_callback(callback_path, test_plan_uuid, [], status='ERROR')
+            _LOG.debug(f'Response from planner: {planner_resp}')
 
 
 def test_status_update(test_plan_uuid, test_id, content):
