@@ -248,7 +248,7 @@ def test_in_execution(test_plan_uuid):
             else 'RUNNING'
         return make_response('{}', OK, {'Content-Type': 'application/json'})
     except Exception as e:
-        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
+        return make_response(json.dumps({'exception': e.args}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(
@@ -263,7 +263,9 @@ def test_finished(test_plan_uuid, test_uuid):
         process_thread.start()
         context['threads'].append(process_thread)
     except Exception as e:
-        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
+        tb = "".join(traceback.format_exc().split("\n"))
+        app.logger.error(f'Error in test_finished callback: {tb}')
+        return make_response(json.dumps({'error': tb}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 
@@ -274,10 +276,30 @@ def test_cancelled(test_plan_uuid, test_uuid):
     # Wrap up, notify
     app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                      f'Content-type: {request.headers["Content-type"]}')
-    payload = request.get_json()
-    context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
-    context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
-    context['events'][test_plan_uuid][test_uuid].set()
+    try:
+        payload = request.get_json()
+        context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
+        if payload['status'] != 'ERROR':
+            app.logger.debug(f'Test #{test_uuid} cancellation was correct on executor')
+            context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
+            context['events'][test_plan_uuid][test_uuid].set()
+        else:
+            app.logger.debug(f'Executor reported some error while running test #{test_uuid}')
+            context['test_preparations'][test_plan_uuid]['test_results'].append(
+                {
+                    'test_uuid': payload['test_uuid'],
+                    'results_uuid': payload['results_uuid'],
+                    'test_status': payload['status'],
+                    'details': payload['message']
+                }
+            )
+            process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, payload, payload['message']))
+            process_thread.start()
+
+    except Exception as e:
+        tb = "".join(traceback.format_exc().split("\n"))
+        app.logger.error(f'Error in test_cancelled callback: {tb}')
+        return make_response(json.dumps({'error': tb}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 
