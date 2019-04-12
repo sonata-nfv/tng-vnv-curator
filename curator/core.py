@@ -72,6 +72,7 @@ CREATED = 201
 ACCEPTED = 202
 BAD_REQUEST = 400
 NOT_FOUND = 404
+NOT_ACCEPTABLE = 406
 INTERNAL_ERROR = 500
 
 
@@ -127,12 +128,15 @@ def handle_new_test_plan():
     elif request.method == 'POST':
         app.logger.debug(f'New test plan received, contains {request.get_data()}, '
                          f'Content-type: {request.headers["Content-type"]}')
+        if request.headers["Content-type"] != 'application/json':
+            return make_response(json.dumps({'exception': 'A valid JSON payload is required', 'status': 'ERROR'}), NOT_ACCEPTABLE,
+                                 {'Content-Type': 'application/json'})
         new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
+        required_keys = {'nsd', 'testd', 'last_test', 'test_plan_callbacks'}
         try:
             payload = request.get_json()
             app.logger.debug(f'Received JSON: {payload}')
-            mandatory_keys = {'nsd', 'testd', 'last_test', 'test_plan_callbacks'}
-            if all(key in payload.keys() for key in mandatory_keys):
+            if all(key in payload.keys() for key in required_keys):
                 # _LOG.debug(f'Received JSON: {payload}')
                 # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
                 # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
@@ -152,7 +156,9 @@ def handle_new_test_plan():
                 #         {'Content-Type': 'application/json'}
                 #     )
             else:
-                raise KeyError(f'Missing keys, mandatory fields are {mandatory_keys}')
+                return make_response(json.dumps({'exception': f'Missing keys, mandatory fields are {required_keys}', 'status': 'ERROR'}),
+                                     NOT_ACCEPTABLE,
+                                     {'Content-Type': 'application/json'})
         except Exception as e:
             return make_response(json.dumps({'exception': e, 'status': 'ERROR'}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
