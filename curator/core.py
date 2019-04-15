@@ -128,7 +128,7 @@ def handle_new_test_plan():
     elif request.method == 'POST':
         app.logger.debug(f'New test plan received, contains {request.get_data()}, '
                          f'Content-type: {request.headers["Content-type"]}')
-        if request.headers["Content-type"] != 'application/json':
+        if request.headers["Content-type"].split(';')[0] != 'application/json':
             return make_response(json.dumps({'exception': 'A valid JSON payload is required', 'status': 'ERROR'}), NOT_ACCEPTABLE,
                                  {'Content-Type': 'application/json'})
         new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
