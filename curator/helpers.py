@@ -145,7 +145,7 @@ def process_test_plan(test_plan_uuid):
                 instantiation_params = [
                     (p_index, augd) for p_index, augd in
                     enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
-                    if augd['platform_type'] == platform_type.lower() and not augd['error']
+                    if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
                 ]
                 if len(instantiation_params) < 1:
                     error_params = instantiation_params = [
@@ -164,8 +164,8 @@ def process_test_plan(test_plan_uuid):
                     _LOG.warning('Test was not found in V&V catalogue, using a mock uuid')
                     test_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd41e51d'}]
                 if len(nsd_cat) == 0:
-                    nsd_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd44e75d'}]
                     _LOG.warning('Nsd was not found in V&V catalogue, using a mock uuid')
+                    nsd_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd44e75d'}]
                 try:
                     test_descriptor_instance = generate_test_descriptor_instance(
                         td.copy(),
@@ -175,8 +175,11 @@ def process_test_plan(test_plan_uuid):
                         package_uuid=inst_result['package_id'],
                         instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
-                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
+                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
+                    (context['test_preparations'][test_plan_uuid]
+                        ['augmented_descriptors'][instantiation_params[0][0]]
+                        ['platform']['name']) = service_platform['name']
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['tdi']) = test_descriptor_instance
@@ -186,16 +189,14 @@ def process_test_plan(test_plan_uuid):
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
-                    (context['test_preparations'][test_plan_uuid]
-                        ['augmented_descriptors'][instantiation_params[0][0]]
-                        ['platform']) = service_platform
                     del context['events'][test_plan_uuid][instance_name]
                     _LOG.debug(f'Response from executor: {ex_response}')
 
                 except Exception as e:
                     tb = "".join(traceback.format_exc().split("\n"))
                     _LOG.error(f'Error during test execution: {tb}')
-                    context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]['test_status'] = 'ERROR'
+                    (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
+                        ['test_status']) = 'ERROR'
                 # # Wait for executor callback (?)
                 # context['events'][instance_name].set()
                 # context['events'][instance_name].wait()
@@ -287,9 +288,9 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
 
 
         #  Shutdown instance
-        _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform_type"]}')
+        _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform"]}')
         pa_termination_response = platform_adapter.shutdown_package(
-            test_finished[1]['platform_type'],
+            test_finished[1]['platform']['name'],
             test_finished[1]['nsi_uuid'])
         _LOG.debug(f'Termination response from PA: {pa_termination_response}')
         # pa_package_removal_response = platform_adapter.delete_package(
@@ -331,7 +332,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
             tb = "".join(traceback.format_exc().split("\n"))
             _LOG.error(f'Error during test_results recovery: {tb}')
             planner_resp = planner.send_callback(callback_path, test_plan_uuid, [], status='ERROR')
-            _LOG.debug(f'Response from planner: {planner_resp}')
+            _LOG.debug(f'Response from planner (Errback): {planner_resp}')
 
 
 def test_status_update(test_plan_uuid, test_id, content):
@@ -357,7 +358,8 @@ def cancel_test_plan(test_plan_uuid, content):
     executor = context['plugin']['executor']
     dockeri = context['plugins']['docker']
     callback_path = context['test_preparations'][test_plan_uuid]['test_plan_callbacks'][1]['url']  #FIXME
-    for test in [run_test for run_test in context['test_preparations'][test_plan_uuid]['augmented_descriptors'] if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
+    for test in [run_test for run_test in context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                 if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
         context['events'][test_plan_uuid][test['test_uuid']] = threading.Event()
         executor.execution_cancel(test_plan_uuid, test['test_uuid'])
         context['events'][test_plan_uuid][test['test_uuid']].wait()

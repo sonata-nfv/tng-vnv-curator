@@ -202,8 +202,8 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
                 {
                     'nsi_uuid': payload['ns_instance_uuid'],
                     'nsi_name': instance_name,
-                    'platform_type': payload['platform_type'],
                     'functions': payload['functions'],
+                    'platform': {'platform_type': payload['platform_type']},
                     'error': None
                 }
             )

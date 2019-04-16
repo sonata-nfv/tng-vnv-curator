@@ -76,7 +76,11 @@ class PlannerInterface(Interface):
             r = requests.post(url, headers=headers, json=payload)
             _LOG.debug(f'ResContent {r.text}'.replace('\n', ' '))
             _LOG.debug(f'ResHeaders {r.headers}')
-            resp = r.json()  # Response should be None
+            # resp = r.json()  # Response should be None
+            if r.status_code == 200:
+                return r.status_code
+            else:
+                return r
         except Exception as e:
             resp = {'error': str(e), 'content': None}
         return resp
