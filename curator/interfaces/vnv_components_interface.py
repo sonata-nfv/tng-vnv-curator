@@ -60,15 +60,29 @@ class PlannerInterface(Interface):
     def add_new_test_plan(self, test_plan_uuid):
         self.__running_test_plans.append(test_plan_uuid)
 
-    def send_callback(self, suffix, test_plan_uuid, results_uuid):
+    def send_callback(self, suffix, test_plan_uuid, result_list, status='UNKNOWN', event_actor='Curator'):
         url = self.__base_url + suffix
         payload = {
+            'event_actor': event_actor,
             'test_plan_uuid': test_plan_uuid,
-            'results_uuid': results_uuid,
-            'status': 'COMPLETED',
+            'status': status,
+            'test_results': result_list
         }
         headers = {"Content-type": "application/json"}
-        resp = requests.post(url, headers=headers, json=payload)
+
+        _LOG.debug(f'Accesing {url}')
+        _LOG.debug(f'Payload {payload}')
+        try:
+            r = requests.post(url, headers=headers, json=payload)
+            _LOG.debug(f'ResContent {r.text}'.replace('\n', ' '))
+            _LOG.debug(f'ResHeaders {r.headers}')
+            # resp = r.json()  # Response should be None
+            if r.status_code == 200:
+                return r.status_code
+            else:
+                return r
+        except Exception as e:
+            resp = {'error': str(e), 'content': None}
         return resp
 
 
@@ -344,8 +358,10 @@ class PlatformAdapterInterface(Interface):
         headers = {"Content-type": "application/json"}
         try:
             response = requests.post(url, headers=headers, json=data)
-            _LOG.debug(f'Response {response.text}')
-            if response.status_code == 200:  # and not response.json()['error']:
+            _LOG.debug(f'Response {response.text}'.replace('\n', ' '))
+            if response.status_code == 200 and not response.json()['error']:
+                return response.json()
+            elif response.json()['error']:
                 return response.json()
             elif response.status_code == 404:
                 raise FileNotFoundError(response.json)
@@ -371,6 +387,12 @@ class PlatformAdapterInterface(Interface):
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
 
     def shutdown_package(self, service_platform, instance_uuid):
+        """
+        Shutdowns the instance and removes the package from the SP
+        :param service_platform:
+        :param instance_uuid:
+        :return:
+        """
         # url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations', 'terminate'])
 
@@ -380,7 +402,7 @@ class PlatformAdapterInterface(Interface):
             _LOG.debug(f'Accesing {url}')
             _LOG.debug(f'Payload {data}')
             response = requests.post(url, headers=headers, json=data)
-            _LOG.debug(f'ResContent {response.text}')
+            _LOG.debug(f'ResContent {response.text}'.replace('\n', ' '))
             _LOG.debug(f'ResHeaders {response.headers}')
             if response.status_code == 200:
                 return response.json()
@@ -410,21 +432,18 @@ class PlatformAdapterInterface(Interface):
             _LOG.exception(e)
             raise e
 
-    def delete_package(self, platform, package_uuid, name=None, vendor=None, version=None):
-        if platform == 'osm':
-            pass
-        elif platform == 'sonata':
-            # if not (name and vendor and version):
-            #     # Get packages and filter by uuid offline, asign to vars
-            #     package_inventory_url = '/'.join([self.base_url, 'adapters', platform, 'packages'])
-            #     response = requests.get()
-            #
-            #     name = str()
-            #     vendor = str()
-            #     version = str()
-            url = '/'.join([self.base_url, 'adapters', platform, 'packages',
-                            name, vendor, version])
-            response = requests.delete(url)
+    def delete_package_sonata(self, service_platform, package_uuid, name=None, vendor=None, version=None):
+        # if not (name and vendor and version):
+        #     # Get packages and filter by uuid offline, asign to vars
+        #     package_inventory_url = '/'.join([self.base_url, 'adapters', service_platform, 'packages'])
+        #     response = requests.get()
+        #
+        #     name = str()
+        #     vendor = str()
+        #     version = str()
+        url = '/'.join([self.base_url, 'adapters', service_platform, 'packages',
+                        name, vendor, version])
+        response = requests.delete(url)
 
     def get_inventory(self, platform):
         url = '/'.join([self.base_url, 'adapters', platform, 'packages'])

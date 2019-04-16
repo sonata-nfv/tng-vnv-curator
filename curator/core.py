@@ -72,6 +72,7 @@ CREATED = 201
 ACCEPTED = 202
 BAD_REQUEST = 400
 NOT_FOUND = 404
+NOT_ACCEPTABLE = 406
 INTERNAL_ERROR = 500
 
 
@@ -125,27 +126,41 @@ def handle_new_test_plan():
             {'Content-Type': 'application/json'}
         )
     elif request.method == 'POST':
+        app.logger.debug(f'New test plan received, contains {request.get_data()}, '
+                         f'Content-type: {request.headers["Content-type"]}')
+        if request.headers["Content-type"].split(';')[0] != 'application/json':
+            return make_response(json.dumps({'exception': 'A valid JSON payload is required', 'status': 'ERROR'}), NOT_ACCEPTABLE,
+                                 {'Content-Type': 'application/json'})
         new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
+        required_keys = {'nsd', 'testd', 'last_test', 'test_plan_callbacks'}
         try:
             payload = request.get_json()
             app.logger.debug(f'Received JSON: {payload}')
-            # _LOG.debug(f'Received JSON: {payload}')
-            # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
-            # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
-            context['test_preparations'][new_uuid] = payload  # Should have
-            process_thread = Thread(target=process_test_plan, args=(new_uuid,))
-            process_thread.start()
-            context['threads'].append(process_thread)
-            return make_response(json.dumps({'test_plan_uuid': new_uuid, 'status': 'STARTING'}),
-                                 CREATED, {'Content-Type': 'application/json'})
-            # else:
-            #     return make_response(
-            #         json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
-            #         BAD_REQUEST,
-            #         {'Content-Type': 'application/json'}
-            #     )
+            if all(key in payload.keys() for key in required_keys):
+                # _LOG.debug(f'Received JSON: {payload}')
+                # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
+                # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
+                context['test_preparations'][new_uuid] = payload  # Should have
+                create_time = datetime.utcnow().replace(microsecond=0)
+                context['test_preparations'][new_uuid]['created_at'] = create_time
+                context['test_preparations'][new_uuid]['updated_at'] = create_time
+                process_thread = Thread(target=process_test_plan, args=(new_uuid,))
+                process_thread.start()
+                context['threads'].append(process_thread)
+                return make_response(json.dumps({'test_plan_uuid': new_uuid, 'status': 'STARTING'}),
+                                     CREATED, {'Content-Type': 'application/json'})
+                # else:
+                #     return make_response(
+                #         json.dumps({'error': 'Keys {} required in payload'.format(required_keys)}),
+                #         BAD_REQUEST,
+                #         {'Content-Type': 'application/json'}
+                #     )
+            else:
+                return make_response(json.dumps({'exception': f'Missing keys, mandatory fields are {required_keys}', 'status': 'ERROR'}),
+                                     NOT_ACCEPTABLE,
+                                     {'Content-Type': 'application/json'})
         except Exception as e:
-            return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
+            return make_response(json.dumps({'exception': e, 'status': 'ERROR'}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_plan_uuid>']),
@@ -153,10 +168,11 @@ def handle_new_test_plan():
 def test_plan_cancelled(test_plan_uuid):
     app.logger.debug(f'Canceling test_plan')
     # _LOG.debug(f'Canceling test_plan ')
+    context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
     process_thread = Thread(target=cancel_test_plan, args=(request.get_json(), test_plan_uuid))
     process_thread.start()
     context['threads'].append(process_thread)
-    return make_response('{"error": null}', ACCEPTED, {'Content-Type': 'application/json'})
+    return make_response('{"error": null, "status": "CANCELLING"}', ACCEPTED, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_plan_uuid>', 'service-instances',
@@ -174,6 +190,7 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
                      f'Content-type: {request.headers["Content-type"]}')
     try:
         payload = request.get_json()
+        context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         # payload = json.loads(request.get_data().decode("UTF-8"))
         # _LOG.debug(f'Callback received, contains {payload}')
         app.logger.debug(f'Callback received, contains {payload}')
@@ -185,8 +202,8 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
                 {
                     'nsi_uuid': payload['ns_instance_uuid'],
                     'nsi_name': instance_name,
-                    'platform_type': payload['platform_type'],
                     'functions': payload['functions'],
+                    'platform': {'platform_type': payload['platform_type']},
                     'error': None
                 }
             )
@@ -210,7 +227,7 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
                 {'Content-Type': 'application/json'}
             )
     except Exception as e:
-        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
+        return make_response(json.dumps({'exception': e.args}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_plan_uuid>', 'change']),
@@ -227,6 +244,7 @@ def test_in_execution(test_plan_uuid):
                      f'Content-type: {request.headers["Content-type"]}')
     try:
         executor_payload = request.get_json()
+        context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         test_index = next(
             (index for (index, d) in
                 enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
@@ -236,7 +254,7 @@ def test_in_execution(test_plan_uuid):
             else 'RUNNING'
         return make_response('{}', OK, {'Content-Type': 'application/json'})
     except Exception as e:
-        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
+        return make_response(json.dumps({'exception': e.args}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(
@@ -246,11 +264,14 @@ def test_finished(test_plan_uuid, test_uuid):
     try:
         app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                          f'Content-type: {request.headers["Content-type"]}')
+        context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, request.get_json(),))
         process_thread.start()
         context['threads'].append(process_thread)
     except Exception as e:
-        return make_response(json.dumps({'exception': e}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
+        tb = "".join(traceback.format_exc().split("\n"))
+        app.logger.error(f'Error in test_finished callback: {tb}')
+        return make_response(json.dumps({'error': tb}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 
@@ -261,9 +282,30 @@ def test_cancelled(test_plan_uuid, test_uuid):
     # Wrap up, notify
     app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                      f'Content-type: {request.headers["Content-type"]}')
-    payload = request.get_json()
-    context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
-    context['events'][test_plan_uuid][test_uuid].set()
+    try:
+        payload = request.get_json()
+        context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
+        if payload['status'] != 'ERROR':
+            app.logger.debug(f'Test #{test_uuid} cancellation was correct on executor')
+            context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
+            context['events'][test_plan_uuid][test_uuid].set()
+        else:
+            app.logger.debug(f'Executor reported some error while running test #{test_uuid}')
+            context['test_preparations'][test_plan_uuid]['test_results'].append(
+                {
+                    'test_uuid': payload['test_uuid'],
+                    'results_uuid': payload['results_uuid'],
+                    'test_status': payload['status'],
+                    'details': payload['message']
+                }
+            )
+            process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, payload, payload['message']))
+            process_thread.start()
+
+    except Exception as e:
+        tb = "".join(traceback.format_exc().split("\n"))
+        app.logger.error(f'Error in test_cancelled callback: {tb}')
+        return make_response(json.dumps({'error': tb}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
 
@@ -278,7 +320,7 @@ def test_cancelled(test_plan_uuid, test_uuid):
 
 #  Utils
 
-@app.route('/'.join(['', API_ROOT, API_VERSION, 'context']),methods=['GET'])
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'context']), methods=['GET'])
 def get_context():
     f_context = {k: context[k] for k in context.keys() if k != 'plugins' and k != 'threads' and k != 'events'}
     return make_response(
@@ -286,6 +328,17 @@ def get_context():
         OK,
         {'Content-Type': 'application/json'}
     )
+
+
+@app.route('/'.join(['', API_ROOT, API_VERSION, 'config', 'mock']), methods=['POST'])
+def configure_mock():
+    payload = request.get_json()
+    if 'mock_platform_adapter' in payload.keys() and payload['mock_platform_adapter']:
+        pass # do mock PA
+    if 'mock_executor' in payload.keys() and payload['mock_executor']:
+        pass  # do mock X
+    if 'mock_planner' in payload.keys() and payload['mock_planner']:
+        pass  # do mock P
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'debugger']),methods=['GET', 'POST'])
@@ -329,6 +382,7 @@ def after_request(response):
                     f' {request.full_path} {response.status} {response.content_length}')
     response.headers.add('X-REQUEST-ID', current_request_id())
     return response
+
 
 def main():
     context['alive_since'] = datetime.utcnow().replace(microsecond=0)

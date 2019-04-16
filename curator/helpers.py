@@ -46,12 +46,12 @@ _LOG = logging.getLogger('flask.app')
 def process_test_plan(test_plan_uuid):
     _LOG.info(f'Processing {test_plan_uuid}')
     # test_plan contains NSD and TD
-    td = context['test_preparations'][test_plan_uuid]['test_descriptor']
-    nsd = context['test_preparations'][test_plan_uuid]['network_service_descriptor']
+    td = context['test_preparations'][test_plan_uuid]['testd']
+    nsd = context['test_preparations'][test_plan_uuid]['nsd']
     context['test_preparations'][test_plan_uuid]['augmented_descriptors'] = []
     context['test_preparations'][test_plan_uuid]['test_results'] = []
     context['events'][test_plan_uuid] = {}
-    # planner = context['plugins']['planner']
+    planner = context['plugins']['planner']
     dockeri = context['plugins']['docker']
     # planner = vnv_i.PlannerInterface()
     # planner.add_new_test_plan(test_plan_uuid)
@@ -75,7 +75,7 @@ def process_test_plan(test_plan_uuid):
 
         context['test_preparations'][test_plan_uuid]['probes'].append(
             {
-                'id': image_id,
+                'id': str(image_id).split(':')[1],
                 'name': probe['name'],
                 'image': probe['image']
             }
@@ -107,7 +107,11 @@ def process_test_plan(test_plan_uuid):
                     test_plan_uuid=test_plan_uuid
                 )
                 if inst_result['error']:
-                    raise Exception(inst_result['error'])
+                    # Error before instantiation
+                    _LOG.error(f"ERROR Response from PA: {inst_result['error']}")
+                    continue
+
+
                 # _LOG.debug(f'After event is set {time.time()}, '
                 #            f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
                 # ~LEGACY~
@@ -136,14 +140,12 @@ def process_test_plan(test_plan_uuid):
                 _LOG.debug(f'Waiting for event {test_plan_uuid}.{instance_name}, '
                            f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
                 context["events"][test_plan_uuid][instance_name].wait()
-                # _LOG.debug(f'After waiting for event {time.time()}, '
-                #            f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
                 _LOG.debug(f"Received parameters from SP: "
                            f"{context['test_preparations'][test_plan_uuid]['augmented_descriptors']}")
                 instantiation_params = [
                     (p_index, augd) for p_index, augd in
                     enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
-                    if augd['platform_type'] == platform_type.lower() and not augd['error']
+                    if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
                 ]
                 if len(instantiation_params) < 1:
                     error_params = instantiation_params = [
@@ -153,8 +155,8 @@ def process_test_plan(test_plan_uuid):
                     ]
                     if error_params:
                         _LOG.error(f'Received error from PA: {error_params}')
-                        # Send callback to planner
-                        raise ValueError(error_params[0])
+                        # Prepare callback to planner
+                        continue
 
                 test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
                 nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
@@ -162,8 +164,8 @@ def process_test_plan(test_plan_uuid):
                     _LOG.warning('Test was not found in V&V catalogue, using a mock uuid')
                     test_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd41e51d'}]
                 if len(nsd_cat) == 0:
-                    nsd_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd44e75d'}]
                     _LOG.warning('Nsd was not found in V&V catalogue, using a mock uuid')
+                    nsd_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd44e75d'}]
                 try:
                     test_descriptor_instance = generate_test_descriptor_instance(
                         td.copy(),
@@ -177,22 +179,24 @@ def process_test_plan(test_plan_uuid):
                     ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
+                        ['platform']['name']) = service_platform['name']
+                    (context['test_preparations'][test_plan_uuid]
+                        ['augmented_descriptors'][instantiation_params[0][0]]
+                        ['tdi']) = test_descriptor_instance
+                    (context['test_preparations'][test_plan_uuid]
+                        ['augmented_descriptors'][instantiation_params[0][0]]
                         ['test_uuid']) = ex_response['test_uuid']
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
-                        ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'STARTING'
-                    (context['test_preparations'][test_plan_uuid]
-                        ['augmented_descriptors'][instantiation_params[0][0]]
-                        ['platform']) = service_platform
+                        ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
                     del context['events'][test_plan_uuid][instance_name]
                     _LOG.debug(f'Response from executor: {ex_response}')
+
                 except Exception as e:
                     tb = "".join(traceback.format_exc().split("\n"))
-                    _LOG.error(f'Something happened... {tb}')
-                    # Call cleanup for which was deployed if there are no more tests running,
-                    # log the error
-
-
+                    _LOG.error(f'Error during test execution: {tb}')
+                    (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
+                        ['test_status']) = 'ERROR'
                 # # Wait for executor callback (?)
                 # context['events'][instance_name].set()
                 # context['events'][instance_name].wait()
@@ -224,37 +228,79 @@ def process_test_plan(test_plan_uuid):
                 # TODO
                 pass
             else:
-                raise NotImplementedError(f'Platform {platform_type} is not compatible')
+                _LOG.warning(f'Platform {platform_type} is not compatible')
+
     else:
         _LOG.error(f'Wrong platform value, should be a list and is a {type(platforms)}')
+        try:
+            callback_path = [
+                d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+                if d['status'] == 'COMPLETED'
+            ][0]
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR')
+        except AttributeError as e:
+            # _LOG.exception(e)
+            _LOG.error(f'Callbacks: {e} but going fallback to /test-plans/on-change/completed')
+            planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR')
+
+    if not context['test_preparations'][test_plan_uuid]['augmented_descriptors']:
+        # No correct test executions, sendind callback
+        _LOG.warning(f'Curator was not able to setup any of the test environments for {test_plan_uuid}, '
+                     f'sending callback to planner')
+        try:
+            callback_path = [
+                d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+                if d['status'] == 'COMPLETED'
+            ][0]
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR')
+        except AttributeError as e:
+            # _LOG.exception(e)
+            _LOG.error(f'Callbacks: {e} but going fallback to /test-plans/on-change/completed')
+            planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR')
     # LOG.debug('completed ' + test_plan)
 
 
 def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
     _LOG.info(f'Test {test_id} from test-plan {test_plan_uuid} finished')
+    _LOG.debug(f'Callback content: {content}')
     platform_adapter = context['plugins']['platform_adapter']
     dockeri = context['plugins']['docker']
     planner = context['plugins']['planner']
     try:
-        callback_path = context['test_preparations'][test_plan_uuid]['paths'].keys()[0]
+        callback_path = [
+            d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+            if d['status'] == 'COMPLETED'
+        ][0]
     except AttributeError as e:
         # _LOG.exception(e)
         _LOG.error(f'Callbacks: {e} but going forward')
-    context['test_preparations'][test_plan_uuid]['test_results'].append(content)
-    context['test_results'].append(content)  # just for debugging
-    test_finished = [
-        (p_index, augd) for p_index, augd in
-        enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
-        if augd['test_uuid'] == test_id
-    ][0]
-    (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-    [test_finished[0]]['test_status']) = content['status'] if 'status' in content.keys() else 'FINISHED'
+        callback_path = ''
+    if not error and content:
+        context['test_preparations'][test_plan_uuid]['test_results'].append(content)
+        context['test_results'].append(content)  # just for debugging
+        test_finished = [
+            (p_index, augd) for p_index, augd in
+            enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
+            if augd['test_uuid'] == test_id
+        ][0]
+        (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+            [test_finished[0]]['test_status']) = content['status'] if 'status' in content.keys() else 'FINISHED'
 
 
-    #  Shutdown instance
-    _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform_type"]}')
-    pa_response = platform_adapter.shutdown_package(test_finished[1]['platform_type'], test_finished[1]['nsi_uuid'])
-    _LOG.debug(f'Response from PA: {pa_response}')
+        #  Shutdown instance
+        _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform"]}')
+        pa_termination_response = platform_adapter.shutdown_package(
+            test_finished[1]['platform']['name'],
+            test_finished[1]['nsi_uuid'])
+        _LOG.debug(f'Termination response from PA: {pa_termination_response}')
+        # pa_package_removal_response = platform_adapter.delete_package(
+        #     test_finished[1]['platform_type'],
+        #     test_finished[1]['tdi']['package_uuid']
+        #     'p_name'
+        # )
+        # TODO: remove package from SP
+    elif error:
+        pass
     if all([d['test_status'] != 'STARTING' and d['test_status'] != 'RUNNING'
             for d in context['test_preparations'][test_plan_uuid]['augmented_descriptors']]):
         #  Remove probe images if there are no more instances running on this test plan
@@ -268,10 +314,25 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
                 _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
 
         #  Answer to planner
-        # planner_resp = planner.send_callback(callback_path, test_plan_uuid,
-        #                                      context['test_preparations'][test_plan_uuid]['test_results'])
-        # if planner_resp ok, clean test_preparations entry
-        del context['test_preparations'][test_plan_uuid]
+        try:
+            res_list = [
+                {
+                    'test_uuid': d['test_uuid'],
+                    'test_results_uuid': d['results_uuid'],
+                    'test_status': d['status']
+                }
+                for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
+            ]
+            _LOG.debug(f'results for test_plan #{test_plan_uuid}: {res_list}')
+            planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='COMPLETED')
+            _LOG.debug(f'Response from planner: {planner_resp}')
+            # if planner_resp ok, clean test_preparations entry
+            del context['test_preparations'][test_plan_uuid]
+        except Exception as e:
+            tb = "".join(traceback.format_exc().split("\n"))
+            _LOG.error(f'Error during test_results recovery: {tb}')
+            planner_resp = planner.send_callback(callback_path, test_plan_uuid, [], status='ERROR')
+            _LOG.debug(f'Response from planner (Errback): {planner_resp}')
 
 
 def test_status_update(test_plan_uuid, test_id, content):
@@ -296,8 +357,9 @@ def cancel_test_plan(test_plan_uuid, content):
     planner = context['plugin']['planner']
     executor = context['plugin']['executor']
     dockeri = context['plugins']['docker']
-    callback_path = context['test_preparations'][test_plan_uuid]['paths'].keys()[0]
-    for test in [run_test for run_test in context['test_preparations'][test_plan_uuid]['augmented_descriptors'] if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
+    callback_path = context['test_preparations'][test_plan_uuid]['test_plan_callbacks'][1]['url']  #FIXME
+    for test in [run_test for run_test in context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                 if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
         context['events'][test_plan_uuid][test['test_uuid']] = threading.Event()
         executor.execution_cancel(test_plan_uuid, test['test_uuid'])
         context['events'][test_plan_uuid][test['test_uuid']].wait()
@@ -309,7 +371,9 @@ def cancel_test_plan(test_plan_uuid, content):
         dockeri.rm_image(probe['image'])
         #  Answer to planner
     planner_resp = planner.send_callback(callback_path, test_plan_uuid,
-                                         context['test_preparations'][test_plan_uuid]['test_results'])
+                                         context['test_preparations'][test_plan_uuid]['test_results'],
+                                         status='CANCELLED'
+                                         )
     # if planner_resp ok, clean test_preparations entry
 
     del context['test_preparations'][test_plan_uuid]

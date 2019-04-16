@@ -1,39 +1,94 @@
 {
-  "test_descriptor":{
-    "descriptor_schema":"https://raw.githubusercontent.com/sonata-nfv/tng-schema/master/test-descriptor/testdescriptor-schema.yml",
-    "vendor":"eu.5gtango.atos",
-    "name":"test-immersive-media",
-    "version":"0.1",
+  "nsd":{
+    "descriptor_schema":"https://raw.githubusercontent.com/sonata-nfv/tng-schema/master/service-descriptor/nsd-schema.yml",
+    "vendor":"eu.sonata-nfv",
+    "name":"mediapilot-service",
+    "version":"0.2",
+    "author":"Ignacio Dominguez @: atos",
+    "description":"This NS provides the video streaming service for the immersive media pilot.",
+    "network_functions":[
+      {
+        "vnf_id":"vnf-ma",
+        "vnf_vendor":"eu.5gtango",
+        "vnf_name":"vnf-ma",
+        "vnf_version":"0.2"
+      },
+      {
+        "vnf_id":"vnf-mse",
+        "vnf_vendor":"eu.5gtango",
+        "vnf_name":"vnf-mse",
+        "vnf_version":"0.2"
+      },
+      {
+        "vnf_id":"vnf-cms",
+        "vnf_vendor":"eu.5gtango",
+        "vnf_name":"vnf-cms",
+        "vnf_version":"0.1"
+      }
+    ],
+    "connection_points":[
+      {
+        "id":"nscpexternal",
+        "interface":"ipv4",
+        "type":"external"
+      }
+    ],
+    "testing_tags":[
+      "packetLossTest"
+    ],
+    "virtual_links":[
+      {
+        "id":"vlexternal",
+        "connectivity_type":"E-LAN",
+        "connection_points_reference":[
+          "vnf-ma:rtmp",
+          "vnf-mse:hls",
+          "vnf-cms:api",
+          "nscpexternal"
+        ]
+      },
+      {
+        "id":"cms-aggregator",
+        "connectivity_type":"E-Line",
+        "connection_points_reference":[
+          "vnf-cms:api",
+          "vnf-ma:api"
+        ]
+      },
+      {
+        "id":"aggregator-mse",
+        "connectivity_type":"E-Line",
+        "connection_points_reference":[
+          "vnf-ma:rtmp",
+          "vnf-mse:rtmp"
+        ]
+      }
+    ]
+  },
+  "testd":{
     "author":"Ignacio Dominguez, Felipe Vicens (ATOS)",
     "description":"Performance test for video analysis",
-    "service_platforms":[
-      "SONATA"
-    ],
-    "test_tags":[
-      "rtmp-media-service"
-    ],
-    "test_category":[
-      "benchmarking"
-    ],
+    "descriptor_schema":"https://raw.githubusercontent.com/sonata-nfv/tng-schema/master/test-descriptor/testdescriptor-schema.yml",
+    "name":"test-immersive-media",
     "phases":[
       {
         "id":"setup",
         "steps":[
           {
-            "name":"deployment",
+            "action":"deploy",
             "description":"Deploying a NS",
-            "action":"deploy"
+            "name":"deployment"
           },
           {
-            "name":"configuration",
-            "description":null,
             "action":"configure",
+            "description":"Configuration",
+            "name":"configuration",
             "probes":[
               {
-                "id":"initiator",
-                "name":"initiator",
-                "image":"sonatanfv/tng-media-pilot-initiator",
                 "description":"A service initial configuration container",
+                "id":"initiator",
+                "image":"ignaciodomin/media-initiator:dev",
+                "name":"initiator",
                 "parameters":[
                   {
                     "key":"CAMERA",
@@ -41,19 +96,52 @@
                   },
                   {
                     "key":"CMS",
-                    "value":"$(default-vnf0/endpoints/id:output/address)"
+                    "value":"$(vnf-cms/endpoints/id:floating-ip/address)"
+                  },
+                  {
+                    "key":"MA",
+                    "value":"$(vnf-ma/endpoints/id:floating-ip/address)"
+                  },
+                  {
+                    "key":"MSE",
+                    "value":"$(vnf-mse/endpoints/id:floating-ip/address)"
                   }
                 ]
               },
               {
-                "id":"cpe",
-                "name":"cpe",
-                "image":"sonatanfv/tng-media-pilot-cpe",
+                "description":"Ffprobe",
+                "id":"ffprobe",
+                "image":"ignaciodomin/media-ffprobe:dev",
+                "name":"ffprobe",
+                "parameters":[
+                  {
+                    "key":"STREAMING_ENGINE",
+                    "value":"$(vnf-mse/endpoints/id:floating-ip/address)"
+                  },
+                  {
+                    "key":"STREAM",
+                    "value":"plane"
+                  }
+                ]
+              },
+              {
+                "description":"Parser",
+                "id":"parser",
+                "image":"ignaciodomin/media-parser:dev",
+                "name":"parser",
+                "parameters":[
+
+                ]
+              },
+              {
                 "description":"Content Producer Emulator (CPE) To generate a RTMP flow",
+                "id":"cpe",
+                "image":"ignaciodomin/media-cpe:plane",
+                "name":"cpe",
                 "parameters":[
                   {
                     "key":"AGGREGATOR",
-                    "value":"$(default-vnf0/endpoints/id:mgmt/address)"
+                    "value":"$(vnf-ma/endpoints/id:floating-ip/address)"
                   },
                   {
                     "key":"APP",
@@ -66,14 +154,14 @@
                 ]
               },
               {
-                "id":"cce",
-                "name":"cce",
-                "image":"sonatanfv/tng-media-pilot-cce",
                 "description":"Content Consumer Emulator (CCE) To play HLS flows from Streaming engine",
+                "id":"cce",
+                "image":"ignaciodomin/media-cce:dev",
+                "name":"cce",
                 "parameters":[
                   {
                     "key":"STREAMMING_ENGINE",
-                    "value":"$(default-vnf0/endpoints/id:input/address)"
+                    "value":"$(vnf-mse/endpoints/id:floating-ip/address)"
                   },
                   {
                     "key":"STREAM",
@@ -86,55 +174,67 @@
         ]
       },
       {
-        "id":"excercise",
+        "id":"exercise",
         "steps":[
           {
-            "name":"configure_service",
-            "description":"Configuration of the service previuos start tests",
-            "run":"initiator",
-            "index":0,
-            "start_delay":0,
-            "instances":1,
-            "output":[
-              {
-                "results":"logs.txt",
-                "verdict":"status.txt"
-              }
-            ]
-          },
-          {
-            "name":"run_camera",
+            "command":"/bin/sh",
             "description":"Starting the CPE that simulates the camera",
-            "run":"cpe",
+            "entrypoint":"/app/entrypoint.sh",
             "index":1,
-            "start_delay":5,
             "instances":1,
+            "name":"cpe",
             "output":[
               {
-                "results":"logs.txt",
-                "graphs":"detail.json"
+                "results":"logs.txt"
               }
             ],
-            "dependencies":[
-              "initiator"
-            ]
+            "run":"cpe"
           },
           {
-            "name":"run_players",
             "description":"Starting the CCE that simulates the consumer",
-            "run":"cce",
+            "entrypoint":"/app/entrypoint.sh",
             "index":2,
-            "start_delay":15,
-            "instances":10,
+            "instances":1,
+            "name":"ffprobe",
             "output":[
               {
-                "results":"logs.txt",
-                "graphs":"detail.json"
+                "results":"logs.txt"
               }
             ],
+            "run":"ffprobe",
+            "start_delay":5
+          },
+          {
+            "description":"Starting the CCE that simulates the consumer",
+            "entrypoint":"/app/entrypoint.sh",
+            "index":3,
+            "instances":1,
+            "name":"cce",
+            "output":[
+              {
+                "results":"logs.txt"
+              }
+            ],
+            "run":"cce",
+            "start_delay":20
+          },
+          {
             "dependencies":[
-              "cpe"
-            ]
+              "cpe",
+              "ffprobe",
+              "cce"
+            ],
+            "description":"Starting the CCE that simulates the consumer",
+            "entrypoint":"/app/entrypoint.sh",
+            "index":4,
+            "instances":1,
+            "name":"parser",
+            "output":[
+              {
+                "results":"logs.txt"
+              }
+            ],
+            "run":"ffprobe"
           }
         ]
       },
@@ -142,102 +242,105 @@
         "id":"verification",
         "steps":[
           {
-            "name":"configuration",
-            "description":"Check service was configured",
-            "step":"configure_service",
-            "condition":[
+            "conditions":[
               {
-                "parser":[
-                  {
-                    "file":"status.txt",
-                    "find":"OK",
-                    "value":"present",
-                    "verdict":"pass"
-                  }
-                ]
+                "condition":"not present",
+                "file":"status.txt",
+                "find":"ERROR",
+                "name":"status",
+                "verdict":"pass"
               }
-            ]
+            ],
+            "description":"Check cpe",
+            "name":"cpe",
+            "step":"cpe"
           },
           {
-            "name":"user_experience",
-            "description":"Check bandwithd received",
-            "step":"run_players",
-            "condition":[
+            "conditions":[
               {
-                "parser":[
-                  {
-                    "file":"detail.json",
-                    "type":"json",
-                    "find":"error_rate",
-                    "value":"< 0.05",
-                    "verdict":"pass"
-                  }
-                ]
+                "condition":"not present",
+                "file":"status.txt",
+                "find":"ERROR",
+                "name":"status",
+                "verdict":"pass"
               }
-            ]
+            ],
+            "description":"Check cce",
+            "name":"cce",
+            "step":"cce"
+          },
+          {
+            "conditions":[
+              {
+                "condition":"not present",
+                "file":"status.txt",
+                "find":"ERROR",
+                "name":"status",
+                "verdict":"pass"
+              }
+            ],
+            "description":"Check ffprobe",
+            "name":"ffprobe",
+            "step":"ffprobe"
+          },
+          {
+            "conditions":[
+              {
+                "condition":"<",
+                "file":"detail.json",
+                "find":"error_rate",
+                "name":"error_rate",
+                "type":"json",
+                "value":"0.05",
+                "verdict":"pass"
+              }
+            ],
+            "description":"Check obtained results",
+            "name":"parser",
+            "step":"parser"
           }
         ]
       }
-    ]
-  },
-  "network_service_descriptor": {
-    "descriptor_schema":"https://raw.githubusercontent.com/sonata-nfv/tng-schema/master/service-descriptor/nsd-schema.yml",
-    "vendor":"eu.5gtango",
-    "name":"5gtango-project-sample",
-    "version":"0.1",
-    "author":"5GTANGO Developer",
-    "description":"Default description",
-    "network_functions":[
-      {
-        "vnf_id":"vnf0",
-        "vnf_vendor":"eu.5gtango",
-        "vnf_name":"default-vnf0",
-        "vnf_version":"0.9"
-      }
     ],
-    "connection_points":[
-      {
-        "id":"mgmt",
-        "interface":"ipv4",
-        "type":"management"
-      },
-      {
-        "id":"input",
-        "interface":"ipv4",
-        "type":"external"
-      },
-      {
-        "id":"output",
-        "interface":"ipv4",
-        "type":"external"
-      }
+    "service_platforms":[
+      "SONATA"
     ],
-    "virtual_links":[
-      {
-        "id":"mgmt",
-        "connectivity_type":"E-LAN",
-        "connection_points_reference":[
-          "vnf0:mgmt",
-          "mgmt"
-        ]
-      },
-      {
-        "id":"input-2-vnf1",
-        "connectivity_type":"E-Line",
-        "connection_points_reference":[
-          "input",
-          "vnf0:input"
-        ]
-      },
-      {
-        "id":"vnf0-2-output",
-        "connectivity_type":"E-Line",
-        "connection_points_reference":[
-          "vnf0:output",
-          "output"
-        ]
-      }
-    ]
+    "test_category":[
+      "benchmarking"
+    ],
+    "test_tags":[
+      "packetLossTest"
+    ],
+    "vendor":"eu.5gtango.atos",
+    "version":"0.1"
   },
-  "paths":""
+  "last_test":false,
+  "test_plan_callbacks":[
+    {
+      "event_actor":"Curator",
+      "url":"/test-plans/on-change/completed",
+      "status":"COMPLETED",
+      "test_plan_uuid":null,
+      "test_results":[
+        {
+          "test_uuid": null,
+          "test_result_uuid": null,
+          "test_status": null
+        }
+      ]
+    },
+    {
+      "event_actor":"Curator",
+      "url":"/test-plans/on-change",
+      "status":"COMPLETED",
+      "test_plan_uuid":null,
+      "test_results":[
+        {
+          "test_uuid": null,
+          "test_result_uuid": null,
+          "test_status": null
+        }
+      ]
+    }
+  ]
 }
