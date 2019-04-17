@@ -137,6 +137,19 @@ def handle_new_test_plan():
             payload = request.get_json()
             app.logger.debug(f'Received JSON: {payload}')
             if all(key in payload.keys() for key in required_keys):
+                missing_content_msg = 'Missing '
+                missing_content_msg_len = len(missing_content_msg)
+                for key in required_keys:
+                    if payload[key] is None:
+                        missing_content_msg += f'{key} content, '
+                if missing_content_msg_len < len(missing_content_msg):
+                    return make_response(
+                        json.dumps({'exception': missing_content_msg[:-2], 'status': 'ERROR'}),
+                        BAD_REQUEST,
+                        {'Content-Type': 'application/json'})
+                else:
+                    del missing_content_msg_len, missing_content_msg
+
                 # _LOG.debug(f'Received JSON: {payload}')
                 # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
                 # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
