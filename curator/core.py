@@ -131,7 +131,6 @@ def handle_new_test_plan():
         if request.headers["Content-type"].split(';')[0] != 'application/json':
             return make_response(json.dumps({'exception': 'A valid JSON payload is required', 'status': 'ERROR'}), NOT_ACCEPTABLE,
                                  {'Content-Type': 'application/json'})
-        new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
         required_keys = {'nsd', 'testd', 'last_test', 'test_plan_callbacks'}
         try:
             payload = request.get_json()
@@ -139,6 +138,12 @@ def handle_new_test_plan():
             if all(key in payload.keys() for key in required_keys):
                 missing_content_msg = 'Missing '
                 missing_content_msg_len = len(missing_content_msg)
+                if 'test_plan_uuid' not in payload.keys:
+                    new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
+                    app.logger.warning(f'There was no test_plan_uuid in payload, generated #{new_uuid}')
+                else:
+                    new_uuid = payload['test_plan_uuid']
+                    app.logger.debug(f'Received new test plan #{new_uuid}')
                 for key in required_keys:
                     if payload[key] is None:
                         missing_content_msg += f'{key} content, '
