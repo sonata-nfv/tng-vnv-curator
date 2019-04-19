@@ -138,7 +138,7 @@ def handle_new_test_plan():
             if all(key in payload.keys() for key in required_keys):
                 missing_content_msg = 'Missing '
                 missing_content_msg_len = len(missing_content_msg)
-                if 'test_plan_uuid' not in payload.keys:
+                if 'test_plan_uuid' not in payload.keys():
                     new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
                     app.logger.warning(f'There was no test_plan_uuid in payload, generated #{new_uuid}')
                 else:
