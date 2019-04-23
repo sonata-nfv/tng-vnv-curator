@@ -288,12 +288,12 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
 
 
         #  Shutdown instance
-        _LOG.debug(f'Termination surpressed for {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform"]}')
-        # _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform"]}')
-        # pa_termination_response = platform_adapter.shutdown_package(
-        #     test_finished[1]['platform']['name'],
-        #     test_finished[1]['nsi_uuid'])
-        # _LOG.debug(f'Termination response from PA: {pa_termination_response}')
+        # _LOG.debug(f'Termination surpressed for {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform"]}')
+        _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform"]}')
+        pa_termination_response = platform_adapter.shutdown_package(
+            test_finished[1]['platform']['name'],
+            test_finished[1]['nsi_uuid'])
+        _LOG.debug(f'Termination response from PA: {pa_termination_response}')
         # pa_package_removal_response = platform_adapter.delete_package(
         #     test_finished[1]['platform_type'],
         #     test_finished[1]['tdi']['package_uuid']
