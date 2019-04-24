@@ -140,6 +140,7 @@ def process_test_plan(test_plan_uuid):
                 _LOG.debug(f'Waiting for event {test_plan_uuid}.{instance_name}, '
                            f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
                 context["events"][test_plan_uuid][instance_name].wait()
+                del context['events'][test_plan_uuid][instance_name]
                 _LOG.debug(f"Received parameters from SP: "
                            f"{context['test_preparations'][test_plan_uuid]['augmented_descriptors']}")
                 instantiation_params = [
@@ -346,7 +347,7 @@ def execute_test_plan():
     pass
 
 
-def cancel_test_plan(test_plan_uuid, content):
+def cancel_test_plan(test_plan_uuid):
     """
     Cancel all running tests on that test_bundle
     and return response to planner
@@ -357,27 +358,73 @@ def cancel_test_plan(test_plan_uuid, content):
     _LOG.info(f'Canceling test-plan {test_plan_uuid} by planner request')
     planner = context['plugin']['planner']
     executor = context['plugin']['executor']
+    platform_adapter = context['plugins']['platform_adapter']
     dockeri = context['plugins']['docker']
-    callback_path = context['test_preparations'][test_plan_uuid]['test_plan_callbacks'][1]['url']  #FIXME
-    for test in [run_test for run_test in context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-                 if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
-        context['events'][test_plan_uuid][test['test_uuid']] = threading.Event()
-        executor.execution_cancel(test_plan_uuid, test['test_uuid'])
-        context['events'][test_plan_uuid][test['test_uuid']].wait()
-        del context['events'][test_plan_uuid][test['test_uuid']]
+    try:
+        callback_path = [
+            d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+            if d['status'] == 'COMPLETED'
+        ][0]
+    except AttributeError as e:
+        # _LOG.exception(e)
+        _LOG.error(f'Callbacks: {e} but going forward')
+        callback_path = ''
+    # Cancel running tests
+    try:
+        for test in [run_test for run_test in context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                     if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
+            context['events'][test_plan_uuid][test['test_uuid']] = threading.Event()
+            _LOG.debug(f'Cancelling test #{test["test_uuid"]}')
+            executor.execution_cancel(test_plan_uuid, test['test_uuid'])
+            context['events'][test_plan_uuid][test['test_uuid']].wait()
+            del context['events'][test_plan_uuid][test['test_uuid']]
+            # clean service platform
+            _LOG.debug(f'Cleanning up test #{test["test_uuid"]} environment')
+            pa_termination_response = platform_adapter.shutdown_package(
+                context['events'][test_plan_uuid][test['test_uuid']]['platform']['name'],
+                context['events'][test_plan_uuid][test['test_uuid']]['nsi_uuid'])
+            _LOG.debug(f'Test #{test["test_uuid"]}: Termination response from PA: {pa_termination_response}')
 
-    _LOG.debug(f'Finished cancelation for test-plan {test_plan_uuid}, '
-               f'cleaning up and sending results to planner')
+        _LOG.debug(f'Finished cancellation for test-plan {test_plan_uuid}, '
+                   f'cleaning up and sending results to planner')
+
+    except Exception as e:
+        tb = "".join(traceback.format_exc().split("\n"))
+        _LOG.error(f'Error during test_results recovery: {tb}')
+        res_list = [
+            {
+                'test_uuid': d['test_uuid'],
+                'test_results_uuid': d['results_uuid'],
+                'test_status': d['status']
+            }
+            for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
+        ]
+        planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='ERROR')
+        _LOG.debug(f'Response from planner (Errback): {planner_resp}')
+
+    # Remove probe images
     for probe in context['test_preparations'][test_plan_uuid]['probes']:
-        dockeri.rm_image(probe['image'])
-        #  Answer to planner
-    planner_resp = planner.send_callback(callback_path, test_plan_uuid,
-                                         context['test_preparations'][test_plan_uuid]['test_results'],
-                                         status='CANCELLED'
-                                         )
-    # if planner_resp ok, clean test_preparations entry
+        try:
+            _LOG.debug(f'Removing {probe["name"]}')
+            dockeri.rm_image(probe['image'])
+        except Exception as e:
+            _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
 
+    res_list = [
+        {
+            'test_uuid': d['test_uuid'],
+            'test_results_uuid': d['results_uuid'],
+            'test_status': d['status']
+        }
+        for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
+    ]
+
+    #  Callback to planner
+    planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='CANCELLED')
+    # if planner_resp ok, clean test_preparations entry
+    _LOG.debug(f'Response from planner: {planner_resp}')
     del context['test_preparations'][test_plan_uuid]
+    _LOG.debug(f'Finished cancellation of {test_plan_uuid}')
 
 
 def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
