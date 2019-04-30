@@ -102,6 +102,7 @@ class DockerInterface(Interface):
         while not image:
             try:
                 image = self.docker_manager.images.pull(image_name)  # image name and uri are the same
+                _LOG.debug(f'Image id: {image.id}')
             except docker.errors.ImageNotFound as e:
                 retry_count += 1
                 if retry_count < retry_max:

@@ -69,18 +69,26 @@ def process_test_plan(test_plan_uuid):
         try:
             image = dockeri.pull(probe['image'])
             image_id = image.short_id
+            context['test_preparations'][test_plan_uuid]['probes'].append(
+                {
+                    'id': str(image_id).split(':')[1],
+                    'name': probe['name'],
+                    'image': probe['image']
+                }
+            )
+            _LOG.debug(f'Got {probe["name"]}, {image}')
         except Exception as e:
             _LOG.exception(e)
             image_id = f'aa-bb-cc-dd-{probe["name"]}'
+            context['test_preparations'][test_plan_uuid]['probes'].append(
+                {
+                    'id': image_id,
+                    'name': probe['name'],
+                    'image': probe['image']
+                }
+            )
+            _LOG.error(f'Exception getting probe {probe["name"]}')
 
-        context['test_preparations'][test_plan_uuid]['probes'].append(
-            {
-                'id': str(image_id).split(':')[1],
-                'name': probe['name'],
-                'image': probe['image']
-            }
-        )
-        # _LOG.debug(f'Got {probe["name"]}, {image}')
     if type(platforms) is list:
 
         # Network service deployment, for each test
@@ -438,7 +446,8 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
         for probe in context['test_preparations'][test_plan_uuid]['probes']:
             try:
                 _LOG.debug(f'Removing {probe["name"]}')
-                dockeri.rm_image(probe['image'])
+                if not probe['id'].startswith('aa-bb-cc-dd'):
+                    dockeri.rm_image(probe['image'])
             except Exception as e:
                 _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
 
