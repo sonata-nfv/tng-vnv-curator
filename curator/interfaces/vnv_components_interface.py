@@ -371,6 +371,50 @@ class PlatformAdapterInterface(Interface):
             _LOG.exception(e)
             raise e
 
+    def automated_instantiation_osm(self, service_platform,
+                                       service_name, service_vendor, service_version,
+                                       instance_name, test_plan_uuid):
+        """
+        Simpler version to instantiate a service, working for sonata
+        :param service_platform:
+        :param service_name:
+        :param service_vendor:
+        :param service_version:
+        :param instance_name:
+        :param callback:
+        :return: network_service
+        """
+        data = {
+            "service_name": service_name,
+            "service_vendor": service_vendor,
+            "service_version": service_version,
+            "service_platform": service_platform,
+            "instance_name": instance_name,
+            "callback": '/'.join([
+                'http:/', context['host'],
+                self.own_api_root, self.own_api_version,
+                'test-preparations', test_plan_uuid,
+                'service-instances', instance_name, 'sp-ready'])
+        }
+        _LOG.debug(f'Instantiation payload: {data}')
+        url = '/'.join([self.base_url, 'adapters', 'instantiate_service'])
+        _LOG.debug(f'Accesing {url}')
+        headers = {"Content-type": "application/json"}
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            _LOG.debug(f'Response {response.text}'.replace('\n', ' '))
+            if response.status_code == 200 and not response.json()['error']:
+                return response.json()
+            elif response.json()['error']:
+                return response.json()
+            elif response.status_code == 404:
+                raise FileNotFoundError(response.json)
+            else:
+                raise Exception(response.json())
+        except Exception as e:
+            _LOG.exception(e)
+            raise e
+
     def instantiate_service_osm(self, service_platform, nsd_name, ns_name, vim_account, instance_name):
         """
         POST tng-vnv-platform-mngr/adapters/<service_platform>/instantiations

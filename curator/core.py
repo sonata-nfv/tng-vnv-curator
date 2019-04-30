@@ -158,7 +158,15 @@ def handle_new_test_plan():
                 # _LOG.debug(f'Received JSON: {payload}')
                 # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
                 # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
-                context['test_preparations'][new_uuid] = payload  # Should have
+                if new_uuid not in context['test_preparations']:
+                    context['test_preparations'][new_uuid] = payload  # Should have
+                else:
+                    msg = f'test-plan ({new_uuid}) exists, aborting'
+                    app.logger.error(msg)
+                    return make_response(
+                        json.dumps({'exception': msg, 'status': 'ERROR'}),
+                        BAD_REQUEST,
+                        {'Content-Type': 'application/json'})
                 create_time = datetime.utcnow().replace(microsecond=0)
                 context['test_preparations'][new_uuid]['created_at'] = create_time
                 context['test_preparations'][new_uuid]['updated_at'] = create_time
