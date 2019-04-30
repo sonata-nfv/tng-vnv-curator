@@ -114,11 +114,10 @@ def process_test_plan(test_plan_uuid):
                     instance_name=instance_name,
                     test_plan_uuid=test_plan_uuid
                 )
-                if inst_result['error']:
+                if 'error' in inst_result and inst_result['error']:
                     # Error before instantiation
-                    _LOG.error(f"ERROR Response from PA: {inst_result['error']}")
+                    _LOG.error(f"SONATA ERROR Response from PA: {inst_result['error']}")
                     continue
-
 
                 # _LOG.debug(f'After event is set {time.time()}, '
                 #            f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
@@ -252,9 +251,9 @@ def process_test_plan(test_plan_uuid):
                     instance_name=instance_name,
                     test_plan_uuid=test_plan_uuid
                 )
-                if inst_result['error']:
+                if 'error' in inst_result and inst_result['error']:
                     # Error before instantiation
-                    _LOG.error(f"ERROR Response from PA: {inst_result['error']}")
+                    _LOG.error(f"OSM ERROR Response from PA: {inst_result['error']}")
                     continue
 
                 # _LOG.debug(f'After event is set {time.time()}, '
