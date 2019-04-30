@@ -238,13 +238,17 @@ def process_test_plan(test_plan_uuid):
                 # _LOG.debug(f'Matching package found {package_info["uuid"]}, transfer to {service_platform["name"]}')
                 # _LOG.debug(f'Matching package found {package_info["uuid"]}, '
                 #            f'instantiating in {service_platform["name"]}')
-                _LOG.debug(f'Instantiating nsd {nsd["vendor"]}:{nsd["name"]}:{nsd["version"]}, '
+                _LOG.debug(f'Instantiating nsd {nsd["nsd:catalog"]["nsd"][0]["vendor"]}:'
+                           f'{nsd["nsd:catalog"]["nsd"][0]["name"]}:'
+                           f'{nsd["nsd:catalog"]["nsd"][0]["version"]}, '
                            f'in {service_platform["name"]}')
-                instance_name = f"{td['name']}-{nsd['name']}-{service_platform['name']}"
+                instance_name = f'{td["name"]}-{nsd["nsd:catalog"]["nsd"][0]["name"]}-{service_platform["name"]}'
                 context['events'][test_plan_uuid][instance_name] = threading.Event()
                 inst_result = platform_adapter.automated_instantiation_osm(
                     service_platform['name'],
-                    nsd['name'], nsd['vendor'], nsd['version'],
+                    nsd["nsd:catalog"]["nsd"][0]['name'],
+                    nsd["nsd:catalog"]["nsd"][0]['vendor'],
+                    nsd["nsd:catalog"]["nsd"][0]['version'],
                     instance_name=instance_name,
                     test_plan_uuid=test_plan_uuid
                 )
