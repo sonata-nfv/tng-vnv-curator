@@ -403,7 +403,7 @@ class PlatformAdapterInterface(Interface):
         try:
             response = requests.post(url, headers=headers, json=data)
             _LOG.debug(f'Response {response.text}'.replace('\n', ' '))
-            if response.status_code == 200 and not response.json()['error']:
+            if response.status_code == 200:
                 return response.json()
             elif response.json()['error']:
                 return response.json()
