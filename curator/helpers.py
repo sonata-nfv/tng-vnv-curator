@@ -596,7 +596,7 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
     for probe in configuration_action[1]['probes']:
         if 'parameters' in probe.keys():
             for i, probe_param in enumerate(probe['parameters']):
-                if probe_param['value'].startswith('$(') and probe_param['value'].endswith(')'):
+                if type(probe_param['value']) == str and probe_param['value'].startswith('$(') and probe_param['value'].endswith(')'):
                     path = probe_param['value'].strip('$()').split('/')
                     for parameter in instantiation_parameters:
                         if parameter['name'] == path[0]:
