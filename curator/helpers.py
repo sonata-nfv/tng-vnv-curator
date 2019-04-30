@@ -304,7 +304,10 @@ def process_test_plan(test_plan_uuid):
                         continue
 
                 test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
-                nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
+                nsd_cat = vnv_cat.get_network_descriptor_tuple(
+                    nsd["nsd:nsd-catalog"]["nsd"][0]['name'],
+                    nsd["nsd:nsd-catalog"]["nsd"][0]['vendor'],
+                    nsd["nsd:nsd-catalog"]["nsd"][0]['version'])
                 if len(test_cat) == 0:
                     _LOG.warning('Test was not found in V&V catalogue, using a mock uuid')
                     test_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd41e51d'}]
