@@ -30,7 +30,7 @@ import requests
 import logging
 import shutil
 from curator.interfaces.interface import Interface
-from curator.logger import TangoLogger
+# from curator.logger import TangoLogger
 
 
 # _LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
@@ -55,7 +55,7 @@ class CatalogueInterface(Interface):
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
-                raise FileNotFoundError
+                raise FileNotFoundError(response.json()['error'])
         except Exception as e:
             _LOG.exception(e)
             raise e
@@ -75,7 +75,7 @@ class CatalogueInterface(Interface):
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
-                raise FileNotFoundError
+                raise FileNotFoundError(response.json()['error'])
         except Exception as e:
             _LOG.exception(e)
             raise e
@@ -88,7 +88,7 @@ class CatalogueInterface(Interface):
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
-                raise FileNotFoundError
+                raise FileNotFoundError(error=response.json()['error'])
         except Exception as e:
             _LOG.exception(e)
             raise e

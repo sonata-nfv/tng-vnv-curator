@@ -119,6 +119,12 @@ def list_routes():
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations']),
            methods=['GET', 'POST'])
 def handle_new_test_plan():
+    """
+    'nsd_uuid', 'testd_uuid', 'last_test', 'test_plan_callbacks' keys are
+    mandatory, but if included, but nsd and testd can be overriden if 'nsd'
+    and/or 'testd' are included.
+    :return:
+    """
     if request.method == 'GET':
         return make_response(
             json.dumps(context['test_preparations']),
@@ -131,7 +137,8 @@ def handle_new_test_plan():
         if request.headers["Content-type"].split(';')[0] != 'application/json':
             return make_response(json.dumps({'exception': 'A valid JSON payload is required', 'status': 'ERROR'}), NOT_ACCEPTABLE,
                                  {'Content-Type': 'application/json'})
-        required_keys = {'nsd', 'testd', 'last_test', 'test_plan_callbacks'}
+        # required_keys = {'nsd', 'testd', 'last_test', 'test_plan_callbacks'}
+        required_keys = {'nsd_uuid', 'testd_uuid', 'last_test', 'test_plan_callbacks'}
         try:
             payload = request.get_json()
             app.logger.debug(f'Received JSON: {payload}')

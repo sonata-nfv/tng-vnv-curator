@@ -36,6 +36,8 @@ from curator.logger import TangoLogger
 # _LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
 _LOG = logging.getLogger('flask.app')
 
+# States: STARTING, COMPLETED, CANCELLING, CANCELLED, ERROR
+
 
 class PlannerInterface(Interface):
     """
@@ -60,11 +62,12 @@ class PlannerInterface(Interface):
     def add_new_test_plan(self, test_plan_uuid):
         self.__running_test_plans.append(test_plan_uuid)
 
-    def send_callback(self, suffix, test_plan_uuid, result_list, status='UNKNOWN', event_actor='Curator'):
+    def send_callback(self, suffix, test_plan_uuid, result_list, status='UNKNOWN', event_actor='Curator', exception=None):
         url = self.__base_url + suffix
         payload = {
             'event_actor': event_actor,
             'test_plan_uuid': test_plan_uuid,
+            'exception': exception,
             'status': status,
             'test_results': result_list
         }

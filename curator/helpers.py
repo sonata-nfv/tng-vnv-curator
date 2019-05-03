@@ -46,8 +46,6 @@ _LOG = logging.getLogger('flask.app')
 def process_test_plan(test_plan_uuid):
     _LOG.info(f'Processing {test_plan_uuid}')
     # test_plan contains NSD and TD
-    td = context['test_preparations'][test_plan_uuid]['testd']
-    nsd = context['test_preparations'][test_plan_uuid]['nsd']
     context['test_preparations'][test_plan_uuid]['augmented_descriptors'] = []
     context['test_preparations'][test_plan_uuid]['test_results'] = []
     context['events'][test_plan_uuid] = {}
@@ -55,17 +53,63 @@ def process_test_plan(test_plan_uuid):
     dockeri = context['plugins']['docker']
     # planner = vnv_i.PlannerInterface()
     # planner.add_new_test_plan(test_plan_uuid)
-    platforms = td['service_platforms']  # should be a list
     platform_adapter = context['plugins']['platform_adapter']
     executor = context['plugins']['executor']
     vnv_cat = context['plugins']['catalogue']
+    try:
+        callback_path = [
+            d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+            if d['status'] == 'COMPLETED'
+        ][0]
+    except AttributeError as e:
+        # _LOG.exception(e)
+        err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+        _LOG.error(err_msg)
+        callback_path = '/test-plans/on-change/completed'
+
+    if 'testd' in context['test_preparations'][test_plan_uuid]:
+        _LOG.warning('Overriding testd_uuid by testd')
+        td = context['test_preparations'][test_plan_uuid]['testd']
+        del context['test_preparations'][test_plan_uuid]['testd_uuid']
+    else:
+        try:
+            td = vnv_cat.get_test_descriptor(context['test_preparations'][test_plan_uuid]['testd_uuid'])
+        except Exception as e:
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=e)
+            return
+
+    # TODO: suport for several nsds (same kind)?
+    # for nsd in context['test_preparations'][test_plan_uuid]['nsd_batch']
+    if 'nsd' in context['test_preparations'][test_plan_uuid] and context['test_preparations'][test_plan_uuid]['nsd']['platform'] == '5gtango':
+        _LOG.warning('Overriding nsd_uuid by nsd, nsd platform is 5gtango')
+        nsd = context['test_preparations'][test_plan_uuid]['nsd']
+        del context['test_preparations'][test_plan_uuid]['nsd_uuid']
+    elif 'nsd' in context['test_preparations'][test_plan_uuid] and context['test_preparations'][test_plan_uuid]['nsd']['platform'] == 'osm':
+        _LOG.warning('Overriding nsd_uuid by nsd, nsd platform is osm')
+        nsd = context['test_preparations'][test_plan_uuid]["nsd:nsd-catalog"]["nsd"][0]
+        del context['test_preparations'][test_plan_uuid]['nsd_uuid']
+    else:
+        try:
+            raw_nsd = vnv_cat.get_network_descriptor(context['test_preparations'][test_plan_uuid]['nsd_uuid'])
+            if raw_nsd['platform'] == '5gtango':
+                nsd = raw_nsd['nsd']
+            elif raw_nsd['platform'] == 'osm':
+                if len(raw_nsd["nsd:nsd-catalog"]["nsd"]) == 1:
+                    nsd = raw_nsd["nsd:nsd-catalog"]["nsd"][0]
+                else:
+                    raise NotImplementedError('VnV is not compatible with multi-service network services')
+        except Exception as e:
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=e)
+            return
+    platforms = td['service_platforms']  # should be a list
     context['test_preparations'][test_plan_uuid]['probes'] = []
     _LOG.debug(f'testd: {td}')
+    # TODO: get nsd and testd if only uuid is included (normal function) and avoid it if there's testd and/or nsd included in the payload
     setup_phase = [phase for phase in td['phases'] if phase['id'] == 'setup'].pop()
     configuration_action = [step for step in setup_phase['steps'] if step['action'] == 'configure'].pop()
     _LOG.debug(f'configuration_phase: {configuration_action}')
     for probe in configuration_action['probes']:
-        _LOG.debug(f'Getting {probe["name"]}')
+        _LOG.debug(f'Gettina g {probe["name"]}')
         try:
             image = dockeri.pull(probe['image'])
             image_id = image.short_id
@@ -155,6 +199,8 @@ def process_test_plan(test_plan_uuid):
                     enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
                     if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
                 ]
+                (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                    [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded']
                 if len(instantiation_params) < 1:
                     error_params = instantiation_params = [
                         (p_index, augd) for p_index, augd in
@@ -165,21 +211,26 @@ def process_test_plan(test_plan_uuid):
                         _LOG.error(f'Received error from PA: {error_params}')
                         # Prepare callback to planner
                         continue
-
-                test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
-                nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
-                if len(test_cat) == 0:
-                    _LOG.warning('Test was not found in V&V catalogue, using a mock uuid')
-                    test_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd41e51d'}]
-                if len(nsd_cat) == 0:
-                    _LOG.warning('Nsd was not found in V&V catalogue, using a mock uuid')
-                    nsd_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd44e75d'}]
+                if 'testd_uuid' not in context['test_preparations'][test_plan_uuid]:
+                    test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
+                    if len(test_cat) == 0:
+                        _LOG.warning('Test was not found in V&V catalogue, using a mock uuid')
+                        context['test_preparations'][test_plan_uuid]['testd_uuid'] = 'deb05341-1337-1337-1337-1c3ecd41e51d'
+                    else:
+                        context['test_preparations'][test_plan_uuid]['testd_uuid'] = test_cat[0]['uuid']
+                if 'nsd_uuid' not in context['test_preparations'][test_plan_uuid]:
+                    nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
+                    if len(nsd_cat) == 0:
+                        _LOG.warning('Nsd was not found in V&V catalogue, using a mock uuid')
+                        context['test_preparations'][test_plan_uuid]['nsd_uuid'] = 'deb05341-1337-1337-1337-1c3ecd44e75d'
+                    else:
+                        context['test_preparations'][test_plan_uuid]['nsd_uuid'] = nsd_cat[0]['uuid']
                 try:
                     test_descriptor_instance = generate_test_descriptor_instance(
                         td.copy(),
                         instantiation_params[0][1]['functions'],
-                        test_uuid=test_cat[0]['uuid'],
-                        service_uuid=nsd_cat[0]['uuid'],
+                        test_uuid=context['test_preparations'][test_plan_uuid]['testd_uuid'],
+                        service_uuid=context['test_preparations'][test_plan_uuid]['nsd_uuid'],
                         package_uuid=inst_result['package_id'],
                         instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
@@ -237,17 +288,17 @@ def process_test_plan(test_plan_uuid):
                 # _LOG.debug(f'Matching package found {package_info["uuid"]}, transfer to {service_platform["name"]}')
                 # _LOG.debug(f'Matching package found {package_info["uuid"]}, '
                 #            f'instantiating in {service_platform["name"]}')
-                _LOG.debug(f'Instantiating nsd {nsd["nsd:nsd-catalog"]["nsd"][0]["vendor"]}:'
-                           f'{nsd["nsd:nsd-catalog"]["nsd"][0]["name"]}:'
-                           f'{nsd["nsd:nsd-catalog"]["nsd"][0]["version"]}, '
+                _LOG.debug(f'Instantiating nsd {nsd["vendor"]}:'
+                           f'{nsd["name"]}:'
+                           f'{nsd["version"]}, '
                            f'in {service_platform["name"]}')
-                instance_name = f'{td["name"]}-{nsd["nsd:nsd-catalog"]["nsd"][0]["name"]}-{service_platform["name"]}'
+                instance_name = f'{td["name"]}-{nsd["name"]}-{service_platform["name"]}'
                 context['events'][test_plan_uuid][instance_name] = threading.Event()
                 inst_result = platform_adapter.automated_instantiation_osm(
                     service_platform['name'],
-                    nsd["nsd:nsd-catalog"]["nsd"][0]['name'],
-                    nsd["nsd:nsd-catalog"]["nsd"][0]['vendor'],
-                    nsd["nsd:nsd-catalog"]["nsd"][0]['version'],
+                    nsd['name'],
+                    nsd['vendor'],
+                    nsd['version'],
                     instance_name=instance_name,
                     test_plan_uuid=test_plan_uuid
                 )
@@ -292,6 +343,8 @@ def process_test_plan(test_plan_uuid):
                     enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
                     if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
                 ]
+                (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                    [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded']
                 if len(instantiation_params) < 1:
                     error_params = instantiation_params = [
                         (p_index, augd) for p_index, augd in
@@ -303,23 +356,26 @@ def process_test_plan(test_plan_uuid):
                         # Prepare callback to planner
                         continue
 
-                test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
-                nsd_cat = vnv_cat.get_network_descriptor_tuple(
-                    nsd["nsd:nsd-catalog"]["nsd"][0]['name'],
-                    nsd["nsd:nsd-catalog"]["nsd"][0]['vendor'],
-                    nsd["nsd:nsd-catalog"]["nsd"][0]['version'])
-                if len(test_cat) == 0:
-                    _LOG.warning('Test was not found in V&V catalogue, using a mock uuid')
-                    test_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd41e51d'}]
-                if len(nsd_cat) == 0:
-                    _LOG.warning('Nsd was not found in V&V catalogue, using a mock uuid')
-                    nsd_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd44e75d'}]
+                if 'testd_uuid' not in context['test_preparations'][test_plan_uuid]:
+                    test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
+                    if len(test_cat) == 0:
+                        _LOG.warning('Test was not found in V&V catalogue, using a mock uuid')
+                        context['test_preparations'][test_plan_uuid]['testd_uuid'] = 'deb05341-1337-1337-1337-1c3ecd41e51d'
+                    else:
+                        context['test_preparations'][test_plan_uuid]['testd_uuid'] = test_cat[0]['uuid']
+                if 'nsd_uuid' not in context['test_preparations'][test_plan_uuid]:
+                    nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
+                    if len(nsd_cat) == 0:
+                        _LOG.warning('Nsd was not found in V&V catalogue, using a mock uuid')
+                        context['test_preparations'][test_plan_uuid]['nsd_uuid'] = 'deb05341-1337-1337-1337-1c3ecd44e75d'
+                    else:
+                        context['test_preparations'][test_plan_uuid]['nsd_uuid'] = nsd_cat[0]['uuid']
                 try:
                     test_descriptor_instance = generate_test_descriptor_instance(
                         td.copy(),
                         instantiation_params[0][1]['functions'],
-                        test_uuid=test_cat[0]['uuid'],
-                        service_uuid=nsd_cat[0]['uuid'],
+                        test_uuid=context['test_preparations'][test_plan_uuid]['testd_uuid'],
+                        service_uuid=context['test_preparations'][test_plan_uuid]['nsd_uuid'],
                         package_uuid=inst_result['package_id'],
                         instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
@@ -373,32 +429,37 @@ def process_test_plan(test_plan_uuid):
                 _LOG.warning(f'Platform {platform_type} is not compatible')
 
     else:
-        _LOG.error(f'Wrong platform value, should be a list and is a {type(platforms)}')
+        err_msg = f'Wrong platform value, should be a list and is a {type(platforms)}'
+        _LOG.error(err_msg)
         try:
             callback_path = [
                 d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
                 if d['status'] == 'COMPLETED'
             ][0]
-            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR')
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
         except AttributeError as e:
             # _LOG.exception(e)
-            _LOG.error(f'Callbacks: {e} but going fallback to /test-plans/on-change/completed')
-            planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR')
+            err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+            _LOG.error(err_msg)
+            planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
 
     if not context['test_preparations'][test_plan_uuid]['augmented_descriptors']:
         # No correct test executions, sendind callback
-        _LOG.warning(f'Curator was not able to setup any of the test environments for {test_plan_uuid}, '
-                     f'sending callback to planner')
+        err_msg = f'Curator was not able to setup any of the test environments for {test_plan_uuid}, ' \
+                  f'sending callback to planner'
+        _LOG.warning(err_msg)
         try:
             callback_path = [
                 d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
                 if d['status'] == 'COMPLETED'
             ][0]
-            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR')
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
         except AttributeError as e:
             # _LOG.exception(e)
-            _LOG.error(f'Callbacks: {e} but going fallback to /test-plans/on-change/completed')
-            planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR')
+            err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+            _LOG.error(err_msg)
+            planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR',
+                                  exception=err_msg)
     # LOG.debug('completed ' + test_plan)
 
 
@@ -475,7 +536,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
         except Exception as e:
             tb = "".join(traceback.format_exc().split("\n"))
             _LOG.error(f'Error during test_results recovery: {tb}')
-            planner_resp = planner.send_callback(callback_path, test_plan_uuid, [], status='ERROR')
+            planner_resp = planner.send_callback(callback_path, test_plan_uuid, [], status='ERROR', exception=tb)
             _LOG.debug(f'Response from planner (Errback): {planner_resp}')
 
 
@@ -541,7 +602,7 @@ def cancel_test_plan(test_plan_uuid):
             }
             for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
         ]
-        planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='ERROR')
+        planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='ERROR', exception=tb)
         _LOG.debug(f'Response from planner (Errback): {planner_resp}')
 
     # Remove probe images
