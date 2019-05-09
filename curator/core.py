@@ -138,7 +138,8 @@ def handle_new_test_plan():
             return make_response(json.dumps({'exception': 'A valid JSON payload is required', 'status': 'ERROR'}), NOT_ACCEPTABLE,
                                  {'Content-Type': 'application/json'})
         # required_keys = {'nsd', 'testd', 'last_test', 'test_plan_callbacks'}
-        required_keys = {'nsd_uuid', 'testd_uuid', 'last_test', 'test_plan_callbacks'}
+        # required_keys = {'nsd_uuid', 'testd_uuid', 'last_test', 'test_plan_callbacks'}
+        required_keys = {'nsd_uuid', 'testd_uuid', 'test_plan_callbacks'}
         try:
             payload = request.get_json()
             app.logger.debug(f'Received JSON: {payload}')
