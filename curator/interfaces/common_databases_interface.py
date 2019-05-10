@@ -50,8 +50,10 @@ class CatalogueInterface(Interface):
         url = '/'.join([self.base_url, 'api', self.VERSION,
                         'network-services', network_uuid])
         headers = {"Content-type": "application/json"}
+        _LOG.debug(f'Getting {url}')
         try:
             response = requests.get(url, headers=headers)
+            _LOG.debug(f'RESP {response.content}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
@@ -83,8 +85,10 @@ class CatalogueInterface(Interface):
     def get_test_descriptor(self, test_uuid):
         url = '/'.join([self.base_url, 'api', self.VERSION, 'tests', test_uuid])
         headers = {"Content-type": "application/json"}
+        _LOG.debug(f'Getting {url}')
         try:
             response = requests.get(url, headers=headers)
+            _LOG.debug(f'RESP {response.content}')
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
