@@ -81,11 +81,13 @@ def process_test_plan(test_plan_uuid):
 
     # NOTE: support for several nsds (same kind) -> NO
     # for nsd in context['test_preparations'][test_plan_uuid]['nsd_batch']
-    if 'nsd' in context['test_preparations'][test_plan_uuid] and context['test_preparations'][test_plan_uuid]['nsd']['platform'] == '5gtango':
+    if 'nsd' in context['test_preparations'][test_plan_uuid] and \
+            context['test_preparations'][test_plan_uuid]['nsd']['platform'] == '5gtango':
         _LOG.warning('Overriding nsd_uuid by nsd, nsd platform is 5gtango')
         nsd = context['test_preparations'][test_plan_uuid]['nsd']
         del context['test_preparations'][test_plan_uuid]['nsd_uuid']
-    elif 'nsd' in context['test_preparations'][test_plan_uuid] and context['test_preparations'][test_plan_uuid]['nsd']['platform'] == 'osm':
+    elif 'nsd' in context['test_preparations'][test_plan_uuid] and \
+            context['test_preparations'][test_plan_uuid]['nsd']['platform'] == 'osm':
         _LOG.warning('Overriding nsd_uuid by nsd, nsd platform is osm')
         nsd = context['test_preparations'][test_plan_uuid]["nsd:nsd-catalog"]["nsd"][0]
         del context['test_preparations'][test_plan_uuid]['nsd_uuid']
@@ -438,11 +440,13 @@ def process_test_plan(test_plan_uuid):
                 if d['status'] == 'COMPLETED'
             ][0]
             planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+            return
         except AttributeError as e:
             # _LOG.exception(e)
             err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
             _LOG.error(err_msg)
             planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+            return
 
     if not context['test_preparations'][test_plan_uuid]['augmented_descriptors']:
         # No correct test executions, sendind callback
@@ -455,12 +459,14 @@ def process_test_plan(test_plan_uuid):
                 if d['status'] == 'COMPLETED'
             ][0]
             planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+            return
         except AttributeError as e:
             # _LOG.exception(e)
             err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
             _LOG.error(err_msg)
             planner.send_callback('/api/v1/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR',
                                   exception=err_msg)
+            return
     # LOG.debug('completed ' + test_plan)
 
 

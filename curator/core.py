@@ -267,8 +267,20 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
                     'error': payload['error']
                 }
             )
+            context['events'][test_plan_uuid][instance_name].set()
+            return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
         else:
             # TODO abort test, reason nsi
+            context['test_preparations'][test_plan_uuid]['augmented_descriptors'].append(
+                {
+                    'nsi_uuid': None,
+                    'platform_type': 'unknown',
+                    'functions': None,
+                    'nsi_name': instance_name,
+                    'error': 'Unknown error'
+                }
+            )
+            context['events'][test_plan_uuid][instance_name].set()
             return make_response(
                 json.dumps({'error': 'Keys {required_keys} required in payload'}),
                 BAD_REQUEST,
