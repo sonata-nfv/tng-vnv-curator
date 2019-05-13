@@ -89,7 +89,7 @@ def process_test_plan(test_plan_uuid):
     elif 'nsd' in context['test_preparations'][test_plan_uuid] and \
             context['test_preparations'][test_plan_uuid]['nsd']['platform'] == 'osm':
         _LOG.warning('Overriding nsd_uuid by nsd, nsd platform is osm')
-        nsd = context['test_preparations'][test_plan_uuid]["nsd:nsd-catalog"]["nsd"][0]
+        nsd = context['test_preparations'][test_plan_uuid]["nsd"]["nsd:nsd-catalog"]["nsd"][0]
         del context['test_preparations'][test_plan_uuid]['nsd_uuid']
     else:
         try:
@@ -97,8 +97,8 @@ def process_test_plan(test_plan_uuid):
             if raw_nsd['platform'] == '5gtango':
                 nsd = raw_nsd['nsd']
             elif raw_nsd['platform'] == 'osm':
-                if len(raw_nsd["nsd:nsd-catalog"]["nsd"]) == 1:
-                    nsd = raw_nsd["nsd:nsd-catalog"]["nsd"][0]
+                if len(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) == 1:
+                    nsd = raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"][0]
                 else:
                     raise NotImplementedError('VnV is not compatible with multi-service network services')
         except Exception as e:
