@@ -97,10 +97,14 @@ def process_test_plan(test_plan_uuid):
             if raw_nsd['platform'] == '5gtango':
                 nsd = raw_nsd['nsd']
             elif raw_nsd['platform'] == 'osm':
-                if len(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) == 1:
+                if type(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) is list and len(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) == 1:
                     nsd = raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"][0]
-                else:
+                elif type(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) is dict:
+                    nsd = raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]
+                elif type(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) is list and len(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) > 1:
                     raise NotImplementedError('VnV is not compatible with multi-service network services')
+                else:
+                    raise ValueError('VnV is not compatible with this network service descriptor')
         except Exception as e:
             planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=e)
             return
