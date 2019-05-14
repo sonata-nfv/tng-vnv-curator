@@ -94,9 +94,14 @@ def process_test_plan(test_plan_uuid):
     else:
         try:
             raw_nsd = vnv_cat.get_network_descriptor(context['test_preparations'][test_plan_uuid]['nsd_uuid'])
-            if raw_nsd['platform'] == '5gtango':
+            if raw_nsd['platform'].lower() == '5gtango':
+                nsd_target = raw_nsd['platform'].lower()
                 nsd = raw_nsd['nsd']
-            elif raw_nsd['platform'] == 'osm':
+            elif raw_nsd['platform'].lower() == 'sonata':
+                nsd_target = raw_nsd['platform'].lower()
+                nsd = raw_nsd['nsd']
+            elif raw_nsd['platform'].lower() == 'osm':
+                nsd_target = raw_nsd['platform'].lower()
                 if type(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) is list and len(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) == 1:
                     nsd = raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"][0]
                 elif type(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) is dict:
@@ -111,6 +116,7 @@ def process_test_plan(test_plan_uuid):
     platforms = td['service_platforms']  # should be a list
     context['test_preparations'][test_plan_uuid]['probes'] = []
     _LOG.debug(f'testd: {td}')
+    _LOG.debug(f'nsd: {nsd}')
     # TODO: get nsd and testd if only uuid is included (normal function) and avoid it if there's testd and/or nsd included in the payload
     setup_phase = [phase for phase in td['phases'] if phase['id'] == 'setup'].pop()
     configuration_action = [step for step in setup_phase['steps'] if step['action'] == 'configure'].pop()
@@ -140,8 +146,11 @@ def process_test_plan(test_plan_uuid):
             )
             _LOG.error(f'Exception getting probe {probe["name"]}')
 
+
+    _LOG.debug()
+
     if type(platforms) is list:
-        if 'SONATA' in platforms and (nsd['platform'].lower() == '5gtango' or nsd['platform'].lower() == 'sonata'):
+        if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
             _LOG.info(f"Accesing {nsd['platform']}")
             platform_type = 'SONATA'
             service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
@@ -281,7 +290,7 @@ def process_test_plan(test_plan_uuid):
             #             ['test_status']) == 'ERROR':
             #         pass  # do running thing
 
-        elif 'OSM' in platforms and (nsd['platform'].lower() == '5gtango' or nsd['platform'].lower() == 'sonata'):
+        elif 'OSM' in platforms and nsd_target == 'osm':
             _LOG.info(f"Accesing {nsd['platform']}")
             platform_type = 'OSM'
             service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
@@ -425,7 +434,7 @@ def process_test_plan(test_plan_uuid):
             #             ['augmented_descriptors'][instantiation_params[0]]
             #             ['test_status']) == 'ERROR':
             #         pass  # do running thing
-        elif 'ONAP' in platforms and (nsd['platform'].lower() == '5gtango' or nsd['platform'].lower() == 'sonata'):
+        elif 'ONAP' in platforms and nsd_target == 'onap':
             _LOG.info(f"Accesing {nsd['platform']}")
             platform_type = 'ONAP'
             _LOG.error(f'Platform {platform_type} not yet implemented')
