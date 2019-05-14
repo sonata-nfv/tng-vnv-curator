@@ -115,8 +115,7 @@ def process_test_plan(test_plan_uuid):
             return
     platforms = td['service_platforms']  # should be a list
     context['test_preparations'][test_plan_uuid]['probes'] = []
-    _LOG.debug(f'testd: {td}')
-    _LOG.debug(f'nsd: {nsd}')
+    _LOG.debug(f'testd: {td}, nsd: {nsd}, nsd_target: {nsd_target}')
     # TODO: get nsd and testd if only uuid is included (normal function) and avoid it if there's testd and/or nsd included in the payload
     setup_phase = [phase for phase in td['phases'] if phase['id'] == 'setup'].pop()
     configuration_action = [step for step in setup_phase['steps'] if step['action'] == 'configure'].pop()
@@ -145,9 +144,6 @@ def process_test_plan(test_plan_uuid):
                 }
             )
             _LOG.error(f'Exception getting probe {probe["name"]}')
-
-
-    _LOG.debug()
 
     if type(platforms) is list:
         if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
