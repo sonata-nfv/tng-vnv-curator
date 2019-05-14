@@ -257,7 +257,7 @@ def process_test_plan(test_plan_uuid):
                 (context['test_preparations'][test_plan_uuid]
                     ['augmented_descriptors'][instantiation_params[0][0]]
                     ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
-                del context['events'][test_plan_uuid][instance_name]
+                # del context['events'][test_plan_uuid][instance_name]
                 _LOG.debug(f'Response from executor: {ex_response}')
 
             except Exception as e:
@@ -402,7 +402,7 @@ def process_test_plan(test_plan_uuid):
                 (context['test_preparations'][test_plan_uuid]
                 ['augmented_descriptors'][instantiation_params[0][0]]
                 ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
-                del context['events'][test_plan_uuid][instance_name]
+                # del context['events'][test_plan_uuid][instance_name]
                 _LOG.debug(f'Response from executor: {ex_response}')
 
             except Exception as e:
