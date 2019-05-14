@@ -81,6 +81,7 @@ def process_test_plan(test_plan_uuid):
 
     # NOTE: support for several nsds (same kind) -> NO
     # for nsd in context['test_preparations'][test_plan_uuid]['nsd_batch']
+    # FIXME: nsd doesn't have platform key
     if 'nsd' in context['test_preparations'][test_plan_uuid] and \
             context['test_preparations'][test_plan_uuid]['nsd']['platform'] == '5gtango':
         _LOG.warning('Overriding nsd_uuid by nsd, nsd platform is 5gtango')
@@ -146,6 +147,11 @@ def process_test_plan(test_plan_uuid):
             _LOG.error(f'Exception getting probe {probe["name"]}')
 
     _LOG.debug('hello')
+    _LOG.debug(type(platforms))
+    _LOG.debug(platforms)
+    _LOG.debug(nsd_target)
+    _LOG.debug('SONATA' in platforms)
+    _LOG.debug(nsd_target == '5gtango' or nsd_target == 'sonata')
     if type(platforms) is list:
         if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
             _LOG.info(f"Accesing {nsd['platform']}")
