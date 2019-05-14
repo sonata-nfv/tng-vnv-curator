@@ -145,6 +145,7 @@ def process_test_plan(test_plan_uuid):
             )
             _LOG.error(f'Exception getting probe {probe["name"]}')
 
+    _LOG.debug('hello')
     if type(platforms) is list:
         if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
             _LOG.info(f"Accesing {nsd['platform']}")
