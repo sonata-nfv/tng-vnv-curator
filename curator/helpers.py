@@ -265,6 +265,8 @@ def process_test_plan(test_plan_uuid):
                 _LOG.error(f'Error during test execution: {tb}')
                 (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
                     ['test_status']) = 'ERROR'
+                (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
+                    ['error']) = tb
             # # Wait for executor callback (?)
             # context['events'][instance_name].set()
             # context['events'][instance_name].wait()
@@ -409,7 +411,9 @@ def process_test_plan(test_plan_uuid):
                 tb = "".join(traceback.format_exc().split("\n"))
                 _LOG.error(f'Error during test execution: {tb}')
                 (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
-                ['test_status']) = 'ERROR'
+                    ['test_status']) = 'ERROR'
+                (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
+                    ['error']) = tb
             # # Wait for executor callback (?)
             # context['events'][instance_name].set()
             # context['events'][instance_name].wait()
@@ -466,6 +470,26 @@ def process_test_plan(test_plan_uuid):
                 if d['status'] == 'COMPLETED'
             ][0]
             planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+            return
+        except AttributeError as e:
+            # _LOG.exception(e)
+            err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+            _LOG.error(err_msg)
+            planner.send_callback('/api/v1/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR',
+                                  exception=err_msg)
+            return
+    elif all([
+        test['test_status'] == 'COMPLETED'
+        or test['test_status'] == 'ERROR'
+        or test['test_status'] == 'CANCELLED'
+        for test in context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+    ]):
+        try:
+            callback_path = [
+                d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+                if d['status'] == 'COMPLETED'
+            ][0]
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR')
             return
         except AttributeError as e:
             # _LOG.exception(e)
