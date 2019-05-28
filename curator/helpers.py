@@ -210,7 +210,8 @@ def process_test_plan(test_plan_uuid):
                 if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
             ]
             (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-                [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded']
+                [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
+                    if 'package_uploaded' in inst_result else False
             if len(instantiation_params) < 1:
                 error_params = instantiation_params = [
                     (p_index, augd) for p_index, augd in
@@ -356,7 +357,8 @@ def process_test_plan(test_plan_uuid):
                 if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
             ]
             (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-                [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded']
+                [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
+                    if 'package_uploaded' in inst_result else False
             if len(instantiation_params) < 1:
                 error_params = instantiation_params = [
                     (p_index, augd) for p_index, augd in
@@ -597,8 +599,8 @@ def cancel_test_plan(test_plan_uuid):
     :return:
     """
     _LOG.info(f'Canceling test-plan {test_plan_uuid} by planner request')
-    planner = context['plugin']['planner']
-    executor = context['plugin']['executor']
+    planner = context['plugins']['planner']
+    executor = context['plugins']['executor']
     platform_adapter = context['plugins']['platform_adapter']
     dockeri = context['plugins']['docker']
     try:

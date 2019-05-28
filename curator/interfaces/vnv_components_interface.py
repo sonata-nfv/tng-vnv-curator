@@ -549,6 +549,8 @@ class ExecutorInterface(Interface):
             _LOG.debug(f'RESPONSE decoded: {response.json()}')
             if response.status_code == 202:  # and not response.json()['error']:
                 return response.json()
+            elif response.status_code == 400:
+                return response.json()
             elif response.status_code == 404:
                 raise FileNotFoundError(response.json())
             else:
