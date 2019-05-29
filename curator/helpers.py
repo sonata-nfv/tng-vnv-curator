@@ -563,7 +563,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
             res_list = [
                 {
                     'test_uuid': d['test_uuid'],
-                    'test_results_uuid': d['results_uuid'],
+                    'test_result_uuid': d['results_uuid'],
                     'test_status': d['status']
                 }
                 for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
@@ -637,7 +637,7 @@ def cancel_test_plan(test_plan_uuid):
         res_list = [
             {
                 'test_uuid': d['test_uuid'],
-                'test_results_uuid': d['results_uuid'],
+                'test_result_uuid': d['results_uuid'],
                 'test_status': d['status']
             }
             for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
@@ -656,7 +656,7 @@ def cancel_test_plan(test_plan_uuid):
     res_list = [
         {
             'test_uuid': d['test_uuid'],
-            'test_results_uuid': d['results_uuid'],
+            'test_result_uuid': d['results_uuid'],
             'test_status': d['status']
         }
         for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
