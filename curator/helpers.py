@@ -46,8 +46,6 @@ _LOG = logging.getLogger('flask.app')
 def process_test_plan(test_plan_uuid):
     _LOG.info(f'Processing {test_plan_uuid}')
     # test_plan contains NSD and TD
-    td = context['test_preparations'][test_plan_uuid]['testd']
-    nsd = context['test_preparations'][test_plan_uuid]['nsd']
     context['test_preparations'][test_plan_uuid]['augmented_descriptors'] = []
     context['test_preparations'][test_plan_uuid]['test_results'] = []
     context['events'][test_plan_uuid] = {}
@@ -55,12 +53,71 @@ def process_test_plan(test_plan_uuid):
     dockeri = context['plugins']['docker']
     # planner = vnv_i.PlannerInterface()
     # planner.add_new_test_plan(test_plan_uuid)
-    platforms = td['service_platforms']  # should be a list
     platform_adapter = context['plugins']['platform_adapter']
     executor = context['plugins']['executor']
     vnv_cat = context['plugins']['catalogue']
+    try:
+        callback_path = [
+            d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+            if d['status'] == 'COMPLETED'
+        ][0]
+    except AttributeError as e:
+        # _LOG.exception(e)
+        err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+        _LOG.error(err_msg)
+        callback_path = '/api/v1/test-plans/on-change/completed'
+
+    if 'testd' in context['test_preparations'][test_plan_uuid]:
+        _LOG.warning('Overriding testd_uuid by testd')
+        td = context['test_preparations'][test_plan_uuid]['testd']
+        del context['test_preparations'][test_plan_uuid]['testd_uuid']
+    else:
+        try:
+            raw_td = vnv_cat.get_test_descriptor(context['test_preparations'][test_plan_uuid]['testd_uuid'])
+            td = raw_td['testd']
+        except Exception as e:
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=e)
+            return
+
+    # NOTE: support for several nsds (same kind) -> NO
+    # for nsd in context['test_preparations'][test_plan_uuid]['nsd_batch']
+    # FIXME: nsd doesn't have platform key
+    if 'nsd' in context['test_preparations'][test_plan_uuid] and \
+            context['test_preparations'][test_plan_uuid]['nsd']['platform'] == '5gtango':
+        _LOG.warning('Overriding nsd_uuid by nsd, nsd platform is 5gtango')
+        nsd = context['test_preparations'][test_plan_uuid]['nsd']
+        del context['test_preparations'][test_plan_uuid]['nsd_uuid']
+    elif 'nsd' in context['test_preparations'][test_plan_uuid] and \
+            context['test_preparations'][test_plan_uuid]['nsd']['platform'] == 'osm':
+        _LOG.warning('Overriding nsd_uuid by nsd, nsd platform is osm')
+        nsd = context['test_preparations'][test_plan_uuid]["nsd"]["nsd:nsd-catalog"]["nsd"][0]
+        del context['test_preparations'][test_plan_uuid]['nsd_uuid']
+    else:
+        try:
+            raw_nsd = vnv_cat.get_network_descriptor(context['test_preparations'][test_plan_uuid]['nsd_uuid'])
+            if raw_nsd['platform'].lower() == '5gtango':
+                nsd_target = raw_nsd['platform'].lower()
+                nsd = raw_nsd['nsd']
+            elif raw_nsd['platform'].lower() == 'sonata':
+                nsd_target = raw_nsd['platform'].lower()
+                nsd = raw_nsd['nsd']
+            elif raw_nsd['platform'].lower() == 'osm':
+                nsd_target = raw_nsd['platform'].lower()
+                if type(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) is list and len(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) == 1:
+                    nsd = raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"][0]
+                elif type(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) is dict:
+                    nsd = raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]
+                elif type(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) is list and len(raw_nsd["nsd"]["nsd:nsd-catalog"]["nsd"]) > 1:
+                    raise NotImplementedError('VnV is not compatible with multi-service network services')
+                else:
+                    raise ValueError('VnV is not compatible with this network service descriptor')
+        except Exception as e:
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=e)
+            return
+    platforms = td['service_platforms']  # should be a list
     context['test_preparations'][test_plan_uuid]['probes'] = []
-    _LOG.debug(f'testd: {td}')
+    _LOG.debug(f'testd: {td}, nsd: {nsd}, nsd_target: {nsd_target}')
+    # TODO: get nsd and testd if only uuid is included (normal function) and avoid it if there's testd and/or nsd included in the payload
     setup_phase = [phase for phase in td['phases'] if phase['id'] == 'setup'].pop()
     configuration_action = [step for step in setup_phase['steps'] if step['action'] == 'configure'].pop()
     _LOG.debug(f'configuration_phase: {configuration_action}')
@@ -69,194 +126,380 @@ def process_test_plan(test_plan_uuid):
         try:
             image = dockeri.pull(probe['image'])
             image_id = image.short_id
+            context['test_preparations'][test_plan_uuid]['probes'].append(
+                {
+                    'id': str(image_id).split(':')[1],
+                    'name': probe['name'],
+                    'image': probe['image']
+                }
+            )
+            _LOG.debug(f'Got {probe["name"]}, {image}')
         except Exception as e:
             _LOG.exception(e)
             image_id = f'aa-bb-cc-dd-{probe["name"]}'
+            context['test_preparations'][test_plan_uuid]['probes'].append(
+                {
+                    'id': image_id,
+                    'name': probe['name'],
+                    'image': probe['image']
+                }
+            )
+            _LOG.error(f'Exception getting probe {probe["name"]}')
 
-        context['test_preparations'][test_plan_uuid]['probes'].append(
-            {
-                'id': str(image_id).split(':')[1],
-                'name': probe['name'],
-                'image': probe['image']
-            }
-        )
-        # _LOG.debug(f'Got {probe["name"]}, {image}')
     if type(platforms) is list:
+        if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
+            _LOG.info(f"Accesing {nsd_target}")
+            platform_type = 'SONATA'
+            service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
+            # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
+            # the nsd, I am keeping this previous block
+            # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
+            # package_info = vnv_cat.get_package_id_from_nsd_tuple(
+            #     nsd['vendor'], nsd['name'], nsd['version'])
+            # _LOG.debug(f'Matching package found {package_info["uuid"]}, transfer to {service_platform["name"]}')
+            # _LOG.debug(f'Matching package found {package_info["uuid"]}, '
+            #            f'instantiating in {service_platform["name"]}')
+            _LOG.debug(f'Instantiating nsd {nsd["vendor"]}:{nsd["name"]}:{nsd["version"]}, '
+                       f'in {service_platform["name"]}')
+            instance_name = f"{td['name']}-{nsd['name']}-{service_platform['name']}"
+            context['events'][test_plan_uuid][instance_name] = threading.Event()
+            inst_result = platform_adapter.automated_instantiation_sonata(
+                service_platform['name'],
+                nsd['name'], nsd['vendor'], nsd['version'],
+                instance_name=instance_name,
+                test_plan_uuid=test_plan_uuid
+            )
+            if 'error' in inst_result and inst_result['error']:
+                # Error before instantiation
+                _LOG.error(f"SONATA ERROR Response from PA: {inst_result['error']}")
 
-        # Network service deployment, for each test
-        for platform_type in platforms:
-            _LOG.info(f'Accesing {platform_type}')
-            if platform_type == 'SONATA':
-                service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
-                # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
-                # the nsd, I am keeping this previous block
-                # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
-                # package_info = vnv_cat.get_package_id_from_nsd_tuple(
-                #     nsd['vendor'], nsd['name'], nsd['version'])
-                # _LOG.debug(f'Matching package found {package_info["uuid"]}, transfer to {service_platform["name"]}')
-                # _LOG.debug(f'Matching package found {package_info["uuid"]}, '
-                #            f'instantiating in {service_platform["name"]}')
-                _LOG.debug(f'Instantiating nsd {nsd["vendor"]}:{nsd["name"]}:{nsd["version"]}, '
-                           f'in {service_platform["name"]}')
-                instance_name = f"{td['name']}-{nsd['name']}-{service_platform['name']}"
-                context['events'][test_plan_uuid][instance_name] = threading.Event()
-                inst_result = platform_adapter.automated_instantiation_sonata(
-                    service_platform['name'],
-                    nsd['name'], nsd['vendor'], nsd['version'],
-                    instance_name=instance_name,
-                    test_plan_uuid=test_plan_uuid
-                )
-                if inst_result['error']:
-                    # Error before instantiation
-                    _LOG.error(f"ERROR Response from PA: {inst_result['error']}")
-                    continue
-
-
-                # _LOG.debug(f'After event is set {time.time()}, '
-                #            f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
-                # ~LEGACY~
-                # sp_package_process_uuid = platform_adapter.transfer_package_sonata(
-                #     package_info, service_platform['name'])
-                # sp_network_service = platform_adapter.get_service_uuid_sonata(
-                #     service_platform['name'],
-                #     nsd['name'], nsd['vendor'], nsd['version'])
-                # _LOG.debug(f'Remote NS is {sp_network_service}, sending instantiation order')
-                # sp_response = platform_adapter.instantiate_service_sonata(
-                #     service_platform['name'], sp_network_service, td['name'])
-                # if sp_response['error']:
-                #     _LOG.error(f'NS {sp_network_service} instantiaton failed: {sp_response["error"]}')
-                #     raise ConnectionError(sp_response['error'])
-                # else:
-                #     _LOG.info(f'NS {sp_network_service} instantiaton process started at {sp_response["id"]}')
-                # wait_for_instatiation(service_platform['name'], sp_response['id'])
-                # if platform_adapter.is_service_instantiation_ready(
-                #         service_platform['name'], sp_response['id']):
-                #     _LOG.debug(f'NS {sp_network_service} instantiaton process successful')
-                # :5001/adapters/qual_sp/instantiations/< id >/monitoring
-                # headers = {"Content-type": "application/json"}
-                # nsr = requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}", headers=headers)
-                # for vnfr_ref in nsr['network_functions']:
-                #   vnfr_rec.append(requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}).json())
-                _LOG.debug(f'Waiting for event {test_plan_uuid}.{instance_name}, '
-                           f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
-                context["events"][test_plan_uuid][instance_name].wait()
-                _LOG.debug(f"Received parameters from SP: "
-                           f"{context['test_preparations'][test_plan_uuid]['augmented_descriptors']}")
-                instantiation_params = [
+            # _LOG.debug(f'After event is set {time.time()}, '
+            #            f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
+            # ~LEGACY~
+            # sp_package_process_uuid = platform_adapter.transfer_package_sonata(
+            #     package_info, service_platform['name'])
+            # sp_network_service = platform_adapter.get_service_uuid_sonata(
+            #     service_platform['name'],
+            #     nsd['name'], nsd['vendor'], nsd['version'])
+            # _LOG.debug(f'Remote NS is {sp_network_service}, sending instantiation order')
+            # sp_response = platform_adapter.instantiate_service_sonata(
+            #     service_platform['name'], sp_network_service, td['name'])
+            # if sp_response['error']:
+            #     _LOG.error(f'NS {sp_network_service} instantiaton failed: {sp_response["error"]}')
+            #     raise ConnectionError(sp_response['error'])
+            # else:
+            #     _LOG.info(f'NS {sp_network_service} instantiaton process started at {sp_response["id"]}')
+            # wait_for_instatiation(service_platform['name'], sp_response['id'])
+            # if platform_adapter.is_service_instantiation_ready(
+            #         service_platform['name'], sp_response['id']):
+            #     _LOG.debug(f'NS {sp_network_service} instantiaton process successful')
+            # :5001/adapters/qual_sp/instantiations/< id >/monitoring
+            # headers = {"Content-type": "application/json"}
+            # nsr = requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}", headers=headers)
+            # for vnfr_ref in nsr['network_functions']:
+            #   vnfr_rec.append(requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}).json())
+            _LOG.debug(f'Waiting for event {test_plan_uuid}.{instance_name}, '
+                       f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
+            context["events"][test_plan_uuid][instance_name].wait()
+            del context['events'][test_plan_uuid][instance_name]
+            _LOG.debug(f"Received parameters from SP: "
+                       f"{context['test_preparations'][test_plan_uuid]['augmented_descriptors']}")
+            instantiation_params = [
+                (p_index, augd) for p_index, augd in
+                enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
+                if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
+            ]
+            (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
+                    if 'package_uploaded' in inst_result else False
+            if len(instantiation_params) < 1:
+                error_params = instantiation_params = [
                     (p_index, augd) for p_index, augd in
                     enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
-                    if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
+                    if augd['error'] and augd['nsi_name'] == instance_name
                 ]
-                if len(instantiation_params) < 1:
-                    error_params = instantiation_params = [
-                        (p_index, augd) for p_index, augd in
-                        enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
-                        if augd['error'] and augd['nsi_name'] == instance_name
-                    ]
-                    if error_params:
-                        _LOG.error(f'Received error from PA: {error_params}')
-                        # Prepare callback to planner
-                        continue
-
+                if error_params:
+                    _LOG.error(f'Received error from PA: {error_params}')
+                    # Prepare callback to planner
+            if 'testd_uuid' not in context['test_preparations'][test_plan_uuid]:
                 test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
-                nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
                 if len(test_cat) == 0:
                     _LOG.warning('Test was not found in V&V catalogue, using a mock uuid')
-                    test_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd41e51d'}]
+                    context['test_preparations'][test_plan_uuid]['testd_uuid'] = 'deb05341-1337-1337-1337-1c3ecd41e51d'
+                else:
+                    context['test_preparations'][test_plan_uuid]['testd_uuid'] = test_cat[0]['uuid']
+            if 'nsd_uuid' not in context['test_preparations'][test_plan_uuid]:
+                nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
                 if len(nsd_cat) == 0:
                     _LOG.warning('Nsd was not found in V&V catalogue, using a mock uuid')
-                    nsd_cat = [{'uuid': 'deb05341-1337-1337-1337-1c3ecd44e75d'}]
-                try:
-                    test_descriptor_instance = generate_test_descriptor_instance(
-                        td.copy(),
-                        instantiation_params[0][1]['functions'],
-                        test_uuid=test_cat[0]['uuid'],
-                        service_uuid=nsd_cat[0]['uuid'],
-                        package_uuid=inst_result['package_id'],
-                        instance_uuid=instantiation_params[0][1]['nsi_uuid']
-                    )
-                    _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
-                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
-                    (context['test_preparations'][test_plan_uuid]
-                        ['augmented_descriptors'][instantiation_params[0][0]]
-                        ['platform']['name']) = service_platform['name']
-                    (context['test_preparations'][test_plan_uuid]
-                        ['augmented_descriptors'][instantiation_params[0][0]]
-                        ['tdi']) = test_descriptor_instance
-                    (context['test_preparations'][test_plan_uuid]
-                        ['augmented_descriptors'][instantiation_params[0][0]]
-                        ['test_uuid']) = ex_response['test_uuid']
-                    (context['test_preparations'][test_plan_uuid]
-                        ['augmented_descriptors'][instantiation_params[0][0]]
-                        ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
-                    del context['events'][test_plan_uuid][instance_name]
-                    _LOG.debug(f'Response from executor: {ex_response}')
+                    context['test_preparations'][test_plan_uuid]['nsd_uuid'] = 'deb05341-1337-1337-1337-1c3ecd44e75d'
+                else:
+                    context['test_preparations'][test_plan_uuid]['nsd_uuid'] = nsd_cat[0]['uuid']
+            try:
+                test_descriptor_instance = generate_test_descriptor_instance(
+                    td.copy(),
+                    instantiation_params[0][1]['functions'],
+                    test_uuid=context['test_preparations'][test_plan_uuid]['testd_uuid'],
+                    service_uuid=context['test_preparations'][test_plan_uuid]['nsd_uuid'],
+                    package_uuid=inst_result['package_id'],
+                    instance_uuid=instantiation_params[0][1]['nsi_uuid']
+                )
+                _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
+                ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
+                (context['test_preparations'][test_plan_uuid]
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['platform']['name']) = service_platform['name']
+                (context['test_preparations'][test_plan_uuid]
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['tdi']) = test_descriptor_instance
+                (context['test_preparations'][test_plan_uuid]
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['test_uuid']) = ex_response['test_uuid']
+                (context['test_preparations'][test_plan_uuid]
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
+                # del context['events'][test_plan_uuid][instance_name]
+                _LOG.debug(f'Response from executor: {ex_response}')
 
-                except Exception as e:
-                    tb = "".join(traceback.format_exc().split("\n"))
-                    _LOG.error(f'Error during test execution: {tb}')
-                    (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
-                        ['test_status']) = 'ERROR'
-                # # Wait for executor callback (?)
-                # context['events'][instance_name].set()
-                # context['events'][instance_name].wait()
-                # loop = True
-                # while loop:
-                #     if (context['test_preparations'][test_plan_uuid]
-                #             ['augmented_descriptors'][instantiation_params[0]]
-                #             ['test_status']) == 'RUNNING':
-                #         pass  # do running thing
-                #     elif (context['test_preparations'][test_plan_uuid]
-                #             ['augmented_descriptors'][instantiation_params[0]]
-                #             ['test_status']) == 'ERROR':
-                #         pass  # do running thing
-                #     elif (context['test_preparations'][test_plan_uuid]
-                #             ['augmented_descriptors'][instantiation_params[0]]
-                #             ['test_status']) == 'COMPLETED':
-                #         pass  # do running thing
-                #     elif (context['test_preparations'][test_plan_uuid]
-                #             ['augmented_descriptors'][instantiation_params[0]]
-                #             ['test_status']) == 'ERROR':
-                #         pass  # do running thing
+            except Exception as e:
+                tb = "".join(traceback.format_exc().split("\n"))
+                _LOG.error(f'Error during test execution: {tb}')
+                (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
+                    ['test_status']) = 'ERROR'
+                (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
+                    ['error']) = tb
+            # # Wait for executor callback (?)
+            # context['events'][instance_name].set()
+            # context['events'][instance_name].wait()
+            # loop = True
+            # while loop:
+            #     if (context['test_preparations'][test_plan_uuid]
+            #             ['augmented_descriptors'][instantiation_params[0]]
+            #             ['test_status']) == 'RUNNING':
+            #         pass  # do running thing
+            #     elif (context['test_preparations'][test_plan_uuid]
+            #             ['augmented_descriptors'][instantiation_params[0]]
+            #             ['test_status']) == 'ERROR':
+            #         pass  # do running thing
+            #     elif (context['test_preparations'][test_plan_uuid]
+            #             ['augmented_descriptors'][instantiation_params[0]]
+            #             ['test_status']) == 'COMPLETED':
+            #         pass  # do running thing
+            #     elif (context['test_preparations'][test_plan_uuid]
+            #             ['augmented_descriptors'][instantiation_params[0]]
+            #             ['test_status']) == 'ERROR':
+            #         pass  # do running thing
 
-            elif platform_type == 'OSM':
-                # TODO
-                sp = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
-                # Use uuids, search for nsd and vnfd (or pass nsd uuid to PA and it will go forward)
-                pass
-            elif platform_type == 'ONAP':
-                # TODO
-                pass
-            else:
-                _LOG.warning(f'Platform {platform_type} is not compatible')
+        elif 'OSM' in platforms and nsd_target == 'osm':
+            _LOG.info(f"Accesing {nsd_target}")
+            platform_type = 'OSM'
+            service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
+            # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
+            # the nsd, I am keeping this previous block
+            # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
+            # package_info = vnv_cat.get_package_id_from_nsd_tuple(
+            #     nsd['vendor'], nsd['name'], nsd['version'])
+            # _LOG.debug(f'Matching package found {package_info["uuid"]}, transfer to {service_platform["name"]}')
+            # _LOG.debug(f'Matching package found {package_info["uuid"]}, '
+            #            f'instantiating in {service_platform["name"]}')
+            _LOG.debug(f'Instantiating nsd {nsd["vendor"]}:'
+                       f'{nsd["name"]}:'
+                       f'{nsd["version"]}, '
+                       f'in {service_platform["name"]}')
+            instance_name = f'{td["name"]}-{nsd["name"]}-{service_platform["name"]}'
+            context['events'][test_plan_uuid][instance_name] = threading.Event()
+            inst_result = platform_adapter.automated_instantiation_osm(
+                service_platform['name'],
+                nsd['name'],
+                nsd['vendor'],
+                nsd['version'],
+                instance_name=instance_name,
+                test_plan_uuid=test_plan_uuid
+            )
+            if 'error' in inst_result and inst_result['error']:
+                # Error before instantiation
+                _LOG.error(f"OSM ERROR Response from PA: {inst_result['error']}")
+
+            # _LOG.debug(f'After event is set {time.time()}, '
+            #            f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
+            # ~LEGACY~
+            # sp_package_process_uuid = platform_adapter.transfer_package_sonata(
+            #     package_info, service_platform['name'])
+            # sp_network_service = platform_adapter.get_service_uuid_sonata(
+            #     service_platform['name'],
+            #     nsd['name'], nsd['vendor'], nsd['version'])
+            # _LOG.debug(f'Remote NS is {sp_network_service}, sending instantiation order')
+            # sp_response = platform_adapter.instantiate_service_sonata(
+            #     service_platform['name'], sp_network_service, td['name'])
+            # if sp_response['error']:
+            #     _LOG.error(f'NS {sp_network_service} instantiaton failed: {sp_response["error"]}')
+            #     raise ConnectionError(sp_response['error'])
+            # else:
+            #     _LOG.info(f'NS {sp_network_service} instantiaton process started at {sp_response["id"]}')
+            # wait_for_instatiation(service_platform['name'], sp_response['id'])
+            # if platform_adapter.is_service_instantiation_ready(
+            #         service_platform['name'], sp_response['id']):
+            #     _LOG.debug(f'NS {sp_network_service} instantiaton process successful')
+            # :5001/adapters/qual_sp/instantiations/< id >/monitoring
+            # headers = {"Content-type": "application/json"}
+            # nsr = requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}", headers=headers)
+            # for vnfr_ref in nsr['network_functions']:
+            #   vnfr_rec.append(requests.get(f"qual-sp-bcn:4012/nsrs/{sp_response['instance_uuid']}).json())
+            _LOG.debug(f'Waiting for event {test_plan_uuid}.{instance_name}, '
+                       f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
+            context["events"][test_plan_uuid][instance_name].wait()
+            del context['events'][test_plan_uuid][instance_name]
+            _LOG.debug(f"Received parameters from SP: "
+                       f"{context['test_preparations'][test_plan_uuid]['augmented_descriptors']}")
+            instantiation_params = [
+                (p_index, augd) for p_index, augd in
+                enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
+                if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
+            ]
+            (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
+                    if 'package_uploaded' in inst_result else False
+            if len(instantiation_params) < 1:
+                error_params = instantiation_params = [
+                    (p_index, augd) for p_index, augd in
+                    enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
+                    if augd['error'] and augd['nsi_name'] == instance_name
+                ]
+                if error_params:
+                    _LOG.error(f'Received error from PA: {error_params}')
+                    # Prepare callback to planner
+
+            if 'testd_uuid' not in context['test_preparations'][test_plan_uuid]:
+                test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
+                if len(test_cat) == 0:
+                    _LOG.warning('Test was not found in V&V catalogue, using a mock uuid')
+                    context['test_preparations'][test_plan_uuid]['testd_uuid'] = 'deb05341-1337-1337-1337-1c3ecd41e51d'
+                else:
+                    context['test_preparations'][test_plan_uuid]['testd_uuid'] = test_cat[0]['uuid']
+            if 'nsd_uuid' not in context['test_preparations'][test_plan_uuid]:
+                nsd_cat = vnv_cat.get_network_descriptor_tuple(nsd['vendor'], nsd['name'], nsd['version'])
+                if len(nsd_cat) == 0:
+                    _LOG.warning('Nsd was not found in V&V catalogue, using a mock uuid')
+                    context['test_preparations'][test_plan_uuid]['nsd_uuid'] = 'deb05341-1337-1337-1337-1c3ecd44e75d'
+                else:
+                    context['test_preparations'][test_plan_uuid]['nsd_uuid'] = nsd_cat[0]['uuid']
+            try:
+                test_descriptor_instance = generate_test_descriptor_instance(
+                    td.copy(),
+                    instantiation_params[0][1]['functions'],
+                    test_uuid=context['test_preparations'][test_plan_uuid]['testd_uuid'],
+                    service_uuid=context['test_preparations'][test_plan_uuid]['nsd_uuid'],
+                    package_uuid=inst_result['package_id'],
+                    instance_uuid=instantiation_params[0][1]['nsi_uuid']
+                )
+                _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
+                ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
+                (context['test_preparations'][test_plan_uuid]
+                ['augmented_descriptors'][instantiation_params[0][0]]
+                ['platform']['name']) = service_platform['name']
+                (context['test_preparations'][test_plan_uuid]
+                ['augmented_descriptors'][instantiation_params[0][0]]
+                ['tdi']) = test_descriptor_instance
+                (context['test_preparations'][test_plan_uuid]
+                ['augmented_descriptors'][instantiation_params[0][0]]
+                ['test_uuid']) = ex_response['test_uuid']
+                (context['test_preparations'][test_plan_uuid]
+                ['augmented_descriptors'][instantiation_params[0][0]]
+                ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
+                # del context['events'][test_plan_uuid][instance_name]
+                _LOG.debug(f'Response from executor: {ex_response}')
+
+            except Exception as e:
+                tb = "".join(traceback.format_exc().split("\n"))
+                _LOG.error(f'Error during test execution: {tb}')
+                (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
+                    ['test_status']) = 'ERROR'
+                (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
+                    ['error']) = tb
+            # # Wait for executor callback (?)
+            # context['events'][instance_name].set()
+            # context['events'][instance_name].wait()
+            # loop = True
+            # while loop:
+            #     if (context['test_preparations'][test_plan_uuid]
+            #             ['augmented_descriptors'][instantiation_params[0]]
+            #             ['test_status']) == 'RUNNING':
+            #         pass  # do running thing
+            #     elif (context['test_preparations'][test_plan_uuid]
+            #             ['augmented_descriptors'][instantiation_params[0]]
+            #             ['test_status']) == 'ERROR':
+            #         pass  # do running thing
+            #     elif (context['test_preparations'][test_plan_uuid]
+            #             ['augmented_descriptors'][instantiation_params[0]]
+            #             ['test_status']) == 'COMPLETED':
+            #         pass  # do running thing
+            #     elif (context['test_preparations'][test_plan_uuid]
+            #             ['augmented_descriptors'][instantiation_params[0]]
+            #             ['test_status']) == 'ERROR':
+            #         pass  # do running thing
+        elif 'ONAP' in platforms and nsd_target == 'onap':
+            _LOG.info(f"Accesing {nsd_target}")
+            platform_type = 'ONAP'
+            _LOG.error(f'Platform {platform_type} not yet implemented')
+        else:
+            _LOG.warning(f"Platform {nsd_target} is not compatible")
 
     else:
-        _LOG.error(f'Wrong platform value, should be a list and is a {type(platforms)}')
+        err_msg = f'Wrong platform value, should be a list and is a {type(platforms)}'
+        _LOG.error(err_msg)
         try:
             callback_path = [
                 d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
                 if d['status'] == 'COMPLETED'
             ][0]
-            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR')
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+            return
         except AttributeError as e:
             # _LOG.exception(e)
-            _LOG.error(f'Callbacks: {e} but going fallback to /test-plans/on-change/completed')
-            planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR')
+            err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+            _LOG.error(err_msg)
+            planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+            return
 
     if not context['test_preparations'][test_plan_uuid]['augmented_descriptors']:
         # No correct test executions, sendind callback
-        _LOG.warning(f'Curator was not able to setup any of the test environments for {test_plan_uuid}, '
-                     f'sending callback to planner')
+        err_msg = f'Curator was not able to setup any of the test environments for {test_plan_uuid}, ' \
+                  f'sending callback to planner'
+        _LOG.warning(err_msg)
+        try:
+            callback_path = [
+                d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+                if d['status'] == 'COMPLETED'
+            ][0]
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+            return
+        except AttributeError as e:
+            # _LOG.exception(e)
+            err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+            _LOG.error(err_msg)
+            planner.send_callback('/api/v1/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR',
+                                  exception=err_msg)
+            return
+    elif all([
+        test['test_status'] == 'COMPLETED'
+        or test['test_status'] == 'ERROR'
+        or test['test_status'] == 'CANCELLED'
+        for test in context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+    ]):
         try:
             callback_path = [
                 d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
                 if d['status'] == 'COMPLETED'
             ][0]
             planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR')
+            return
         except AttributeError as e:
             # _LOG.exception(e)
-            _LOG.error(f'Callbacks: {e} but going fallback to /test-plans/on-change/completed')
-            planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR')
+            err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+            _LOG.error(err_msg)
+            planner.send_callback('/api/v1/test-plans/on-change/completed', test_plan_uuid, result_list=[], status='ERROR',
+                                  exception=err_msg)
+            return
     # LOG.debug('completed ' + test_plan)
 
 
@@ -288,6 +531,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
 
 
         #  Shutdown instance
+        # _LOG.debug(f'Termination surpressed for {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform"]}')
         _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform"]}')
         pa_termination_response = platform_adapter.shutdown_package(
             test_finished[1]['platform']['name'],
@@ -309,7 +553,8 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
         for probe in context['test_preparations'][test_plan_uuid]['probes']:
             try:
                 _LOG.debug(f'Removing {probe["name"]}')
-                dockeri.rm_image(probe['image'])
+                if not probe['id'].startswith('aa-bb-cc-dd'):
+                    dockeri.rm_image(probe['image'])
             except Exception as e:
                 _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
 
@@ -331,7 +576,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
         except Exception as e:
             tb = "".join(traceback.format_exc().split("\n"))
             _LOG.error(f'Error during test_results recovery: {tb}')
-            planner_resp = planner.send_callback(callback_path, test_plan_uuid, [], status='ERROR')
+            planner_resp = planner.send_callback(callback_path, test_plan_uuid, [], status='ERROR', exception=tb)
             _LOG.debug(f'Response from planner (Errback): {planner_resp}')
 
 
@@ -345,7 +590,7 @@ def execute_test_plan():
     pass
 
 
-def cancel_test_plan(test_plan_uuid, content):
+def cancel_test_plan(test_plan_uuid):
     """
     Cancel all running tests on that test_bundle
     and return response to planner
@@ -354,29 +599,75 @@ def cancel_test_plan(test_plan_uuid, content):
     :return:
     """
     _LOG.info(f'Canceling test-plan {test_plan_uuid} by planner request')
-    planner = context['plugin']['planner']
-    executor = context['plugin']['executor']
+    planner = context['plugins']['planner']
+    executor = context['plugins']['executor']
+    platform_adapter = context['plugins']['platform_adapter']
     dockeri = context['plugins']['docker']
-    callback_path = context['test_preparations'][test_plan_uuid]['test_plan_callbacks'][1]['url']  #FIXME
-    for test in [run_test for run_test in context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-                 if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
-        context['events'][test_plan_uuid][test['test_uuid']] = threading.Event()
-        executor.execution_cancel(test_plan_uuid, test['test_uuid'])
-        context['events'][test_plan_uuid][test['test_uuid']].wait()
-        del context['events'][test_plan_uuid][test['test_uuid']]
+    try:
+        callback_path = [
+            d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+            if d['status'] == 'COMPLETED'
+        ][0]
+    except AttributeError as e:
+        # _LOG.exception(e)
+        _LOG.error(f'Callbacks: {e} but going forward')
+        callback_path = ''
+    # Cancel running tests
+    try:
+        for test in [run_test for run_test in context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                     if run_test['test_status'] == 'RUNNING' or run_test['test_status'] == 'STARTING']:
+            context['events'][test_plan_uuid][test['test_uuid']] = threading.Event()
+            _LOG.debug(f'Cancelling test #{test["test_uuid"]}')
+            executor.execution_cancel(test_plan_uuid, test['test_uuid'])
+            context['events'][test_plan_uuid][test['test_uuid']].wait()
+            del context['events'][test_plan_uuid][test['test_uuid']]
+            # clean service platform
+            _LOG.debug(f'Cleanning up test #{test["test_uuid"]} environment')
+            pa_termination_response = platform_adapter.shutdown_package(
+                context['events'][test_plan_uuid][test['test_uuid']]['platform']['name'],
+                context['events'][test_plan_uuid][test['test_uuid']]['nsi_uuid'])
+            _LOG.debug(f'Test #{test["test_uuid"]}: Termination response from PA: {pa_termination_response}')
 
-    _LOG.debug(f'Finished cancelation for test-plan {test_plan_uuid}, '
-               f'cleaning up and sending results to planner')
+        _LOG.debug(f'Finished cancellation for test-plan {test_plan_uuid}, '
+                   f'cleaning up and sending results to planner')
+
+    except Exception as e:
+        tb = "".join(traceback.format_exc().split("\n"))
+        _LOG.error(f'Error during test_results recovery: {tb}')
+        res_list = [
+            {
+                'test_uuid': d['test_uuid'],
+                'test_results_uuid': d['results_uuid'],
+                'test_status': d['status']
+            }
+            for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
+        ]
+        planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='ERROR', exception=tb)
+        _LOG.debug(f'Response from planner (Errback): {planner_resp}')
+
+    # Remove probe images
     for probe in context['test_preparations'][test_plan_uuid]['probes']:
-        dockeri.rm_image(probe['image'])
-        #  Answer to planner
-    planner_resp = planner.send_callback(callback_path, test_plan_uuid,
-                                         context['test_preparations'][test_plan_uuid]['test_results'],
-                                         status='CANCELLED'
-                                         )
-    # if planner_resp ok, clean test_preparations entry
+        try:
+            _LOG.debug(f'Removing {probe["name"]}')
+            dockeri.rm_image(probe['image'])
+        except Exception as e:
+            _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
 
+    res_list = [
+        {
+            'test_uuid': d['test_uuid'],
+            'test_results_uuid': d['results_uuid'],
+            'test_status': d['status']
+        }
+        for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
+    ]
+
+    #  Callback to planner
+    planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='CANCELLED')
+    # if planner_resp ok, clean test_preparations entry
+    _LOG.debug(f'Response from planner: {planner_resp}')
     del context['test_preparations'][test_plan_uuid]
+    _LOG.debug(f'Finished cancellation of {test_plan_uuid}')
 
 
 def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
@@ -406,7 +697,7 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
     for probe in configuration_action[1]['probes']:
         if 'parameters' in probe.keys():
             for i, probe_param in enumerate(probe['parameters']):
-                if probe_param['value'].startswith('$(') and probe_param['value'].endswith(')'):
+                if type(probe_param['value']) == str and probe_param['value'].startswith('$(') and probe_param['value'].endswith(')'):
                     path = probe_param['value'].strip('$()').split('/')
                     for parameter in instantiation_parameters:
                         if parameter['name'] == path[0]:

@@ -119,6 +119,12 @@ def list_routes():
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations']),
            methods=['GET', 'POST'])
 def handle_new_test_plan():
+    """
+    'nsd_uuid', 'testd_uuid', 'last_test', 'test_plan_callbacks' keys are
+    mandatory, but if included, but nsd and testd can be overriden if 'nsd'
+    and/or 'testd' are included.
+    :return:
+    """
     if request.method == 'GET':
         return make_response(
             json.dumps(context['test_preparations']),
@@ -131,7 +137,9 @@ def handle_new_test_plan():
         if request.headers["Content-type"].split(';')[0] != 'application/json':
             return make_response(json.dumps({'exception': 'A valid JSON payload is required', 'status': 'ERROR'}), NOT_ACCEPTABLE,
                                  {'Content-Type': 'application/json'})
-        required_keys = {'nsd', 'testd', 'last_test', 'test_plan_callbacks'}
+        # required_keys = {'nsd', 'testd', 'last_test', 'test_plan_callbacks'}
+        # required_keys = {'nsd_uuid', 'testd_uuid', 'last_test', 'test_plan_callbacks'}
+        required_keys = {'nsd_uuid', 'testd_uuid', 'test_plan_callbacks'}
         try:
             payload = request.get_json()
             app.logger.debug(f'Received JSON: {payload}')
@@ -158,7 +166,15 @@ def handle_new_test_plan():
                 # _LOG.debug(f'Received JSON: {payload}')
                 # required_keys = {'test_descriptor', 'network_service_descriptor', 'paths'}
                 # if payload.keys() is not None and all(key in payload.keys() for key in required_keys):
-                context['test_preparations'][new_uuid] = payload  # Should have
+                if new_uuid not in context['test_preparations']:
+                    context['test_preparations'][new_uuid] = payload  # Should have
+                else:
+                    msg = f'test-plan ({new_uuid}) exists, aborting'
+                    app.logger.error(msg)
+                    return make_response(
+                        json.dumps({'exception': msg, 'status': 'ERROR'}),
+                        BAD_REQUEST,
+                        {'Content-Type': 'application/json'})
                 create_time = datetime.utcnow().replace(microsecond=0)
                 context['test_preparations'][new_uuid]['created_at'] = create_time
                 context['test_preparations'][new_uuid]['updated_at'] = create_time
@@ -182,19 +198,33 @@ def handle_new_test_plan():
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations', '<test_plan_uuid>']),
-           methods=['DELETE'])
+           methods=['GET', 'DELETE'])
 def test_plan_cancelled(test_plan_uuid):
-    app.logger.debug(f'Canceling test_plan')
-    # _LOG.debug(f'Canceling test_plan ')
-    context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
-    process_thread = Thread(target=cancel_test_plan, args=(request.get_json(), test_plan_uuid))
-    process_thread.start()
-    context['threads'].append(process_thread)
-    return make_response('{"error": null, "status": "CANCELLING"}', ACCEPTED, {'Content-Type': 'application/json'})
+    if request.method == 'GET':
+        # single test_plan status
+        # TODO: Update function name and description to avoid misunderstanding
+        return make_response(
+            json.dumps(context['test_preparations'][test_plan_uuid]),
+            OK,
+            {'Content-Type': 'application/json'}
+        )
+    elif request.method == 'DELETE':
+        app.logger.debug(f'Cancelling test_plan {test_plan_uuid}')
+        if test_plan_uuid not in context['test_preparations']:
+            make_response(
+                '{"exception":"Test-plan requested for cancellation is not currently executing", "status":"ERROR"}',
+                NOT_FOUND,
+                {'Content-Type': 'application/json'}
+            )
+        context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
+        process_thread = Thread(target=cancel_test_plan, args=(test_plan_uuid, ))
+        process_thread.start()
+        context['threads'].append(process_thread)
+        return make_response('{"error": null, "status": "CANCELLING"}', ACCEPTED, {'Content-Type': 'application/json'})
 
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'test-preparations','<test_plan_uuid>', 'service-instances',
-                     '<instance_name>','sp-ready']),
+                     '<instance_name>', 'sp-ready']),
            methods=['POST'])
 def prepare_environment_callback(test_plan_uuid, instance_name):
     """
@@ -237,8 +267,20 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
                     'error': payload['error']
                 }
             )
+            context['events'][test_plan_uuid][instance_name].set()
+            return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
         else:
             # TODO abort test, reason nsi
+            context['test_preparations'][test_plan_uuid]['augmented_descriptors'].append(
+                {
+                    'nsi_uuid': None,
+                    'platform_type': 'unknown',
+                    'functions': None,
+                    'nsi_name': instance_name,
+                    'error': 'Unknown error'
+                }
+            )
+            context['events'][test_plan_uuid][instance_name].set()
             return make_response(
                 json.dumps({'error': 'Keys {required_keys} required in payload'}),
                 BAD_REQUEST,
@@ -308,18 +350,9 @@ def test_cancelled(test_plan_uuid, test_uuid):
             context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
             context['events'][test_plan_uuid][test_uuid].set()
         else:
-            app.logger.debug(f'Executor reported some error while running test #{test_uuid}')
-            context['test_preparations'][test_plan_uuid]['test_results'].append(
-                {
-                    'test_uuid': payload['test_uuid'],
-                    'results_uuid': payload['results_uuid'],
-                    'test_status': payload['status'],
-                    'details': payload['message']
-                }
-            )
-            process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, payload, payload['message']))
-            process_thread.start()
-
+            app.logger.debug(f'Executor reported some error while cancelling test #{test_uuid}')
+            context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
+            context['events'][test_plan_uuid][test_uuid].set()
     except Exception as e:
         tb = "".join(traceback.format_exc().split("\n"))
         app.logger.error(f'Error in test_cancelled callback: {tb}')
