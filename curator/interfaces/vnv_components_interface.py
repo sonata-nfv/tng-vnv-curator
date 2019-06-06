@@ -433,7 +433,7 @@ class PlatformAdapterInterface(Interface):
         """
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
 
-    def shutdown_package(self, service_platform, instance_uuid):
+    def shutdown_package(self, service_platform, instance_uuid, package_uploaded):
         """
         Shutdowns the instance and removes the package from the SP
         :param service_platform:
@@ -443,7 +443,7 @@ class PlatformAdapterInterface(Interface):
         # url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
         url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations', 'terminate'])
 
-        data = {"instance_uuid": instance_uuid, "request_type": "TERMINATE_SERVICE"}
+        data = {"instance_uuid": instance_uuid, "request_type": "TERMINATE_SERVICE", "package_uploaded": package_uploaded}
         headers = {"Content-type": "application/json"}
         try:
             _LOG.debug(f'Accesing {url}')

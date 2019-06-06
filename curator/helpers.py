@@ -535,7 +535,9 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
         _LOG.debug(f'Terminating service instance {test_finished[1]["nsi_uuid"]} on {test_finished[1]["platform"]}')
         pa_termination_response = platform_adapter.shutdown_package(
             test_finished[1]['platform']['name'],
-            test_finished[1]['nsi_uuid'])
+            test_finished[1]['nsi_uuid'],
+            test_finished[1]["package_uploaded"]
+        )
         _LOG.debug(f'Termination response from PA: {pa_termination_response}')
         # pa_package_removal_response = platform_adapter.delete_package(
         #     test_finished[1]['platform_type'],
@@ -563,7 +565,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
             res_list = [
                 {
                     'test_uuid': d['test_uuid'],
-                    'test_results_uuid': d['results_uuid'],
+                    'test_result_uuid': d['results_uuid'],
                     'test_status': d['status']
                 }
                 for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
@@ -625,7 +627,9 @@ def cancel_test_plan(test_plan_uuid):
             _LOG.debug(f'Cleanning up test #{test["test_uuid"]} environment')
             pa_termination_response = platform_adapter.shutdown_package(
                 context['events'][test_plan_uuid][test['test_uuid']]['platform']['name'],
-                context['events'][test_plan_uuid][test['test_uuid']]['nsi_uuid'])
+                context['events'][test_plan_uuid][test['test_uuid']]['nsi_uuid'],
+                context['events'][test_plan_uuid][test['test_uuid']]['package_uploaded']
+            )
             _LOG.debug(f'Test #{test["test_uuid"]}: Termination response from PA: {pa_termination_response}')
 
         _LOG.debug(f'Finished cancellation for test-plan {test_plan_uuid}, '
@@ -637,7 +641,7 @@ def cancel_test_plan(test_plan_uuid):
         res_list = [
             {
                 'test_uuid': d['test_uuid'],
-                'test_results_uuid': d['results_uuid'],
+                'test_result_uuid': d['results_uuid'],
                 'test_status': d['status']
             }
             for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
@@ -656,7 +660,7 @@ def cancel_test_plan(test_plan_uuid):
     res_list = [
         {
             'test_uuid': d['test_uuid'],
-            'test_results_uuid': d['results_uuid'],
+            'test_result_uuid': d['results_uuid'],
             'test_status': d['status']
         }
         for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
