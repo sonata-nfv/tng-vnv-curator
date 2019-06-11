@@ -344,15 +344,27 @@ def test_cancelled(test_plan_uuid, test_uuid):
                      f'Content-type: {request.headers["Content-type"]}')
     try:
         payload = request.get_json()
+        if test_plan_uuid not in context['test_preparations']:
+            make_response(
+                '{"exception":"Test-plan requested for cancellation is not currently executing", "status":"ERROR"}',
+                NOT_FOUND,
+                {'Content-Type': 'application/json'}
+            )
         context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         if payload['status'] != 'ERROR':
             app.logger.debug(f'Test #{test_uuid} cancellation was correct on executor')
             context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
-            context['events'][test_plan_uuid][test_uuid].set()
+            if test_uuid in context['events'][test_plan_uuid]:
+                context['events'][test_plan_uuid][test_uuid].set()
+            else:
+                app.logger.warning(f'Test {test_uuid} appears to be cancelled or non-existent')
         else:
             app.logger.debug(f'Executor reported some error while cancelling test #{test_uuid}')
             context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
-            context['events'][test_plan_uuid][test_uuid].set()
+            if test_uuid in context['events'][test_plan_uuid]:
+                context['events'][test_plan_uuid][test_uuid].set()
+            else:
+                app.logger.warning(f'Test {test_uuid} appears to be cancelled or non-existent')
     except Exception as e:
         tb = "".join(traceback.format_exc().split("\n"))
         app.logger.error(f'Error in test_cancelled callback: {tb}')
