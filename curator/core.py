@@ -353,18 +353,24 @@ def test_cancelled(test_plan_uuid, test_uuid):
         context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         if payload['status'] != 'ERROR':
             app.logger.debug(f'Test #{test_uuid} cancellation was correct on executor')
+            context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
             context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
             if test_uuid in context['events'][test_plan_uuid]:
+                app.logger.warning(f'Resuming test {test_uuid} cancelation process')
                 context['events'][test_plan_uuid][test_uuid].set()
             else:
-                app.logger.warning(f'Test {test_uuid} appears to be cancelled or non-existent')
+                app.logger.warning(f'Test {test_uuid} appears to be canceled or non-existent')
         else:
             app.logger.debug(f'Executor reported some error while cancelling test #{test_uuid}')
             context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
             if test_uuid in context['events'][test_plan_uuid]:
                 context['events'][test_plan_uuid][test_uuid].set()
             else:
-                app.logger.warning(f'Test {test_uuid} appears to be cancelled or non-existent')
+                app.logger.warning(f'Test {test_uuid} appears to be canceled or non-existent, or test failed')
+            context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
+            process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, request.get_json(),))
+            process_thread.start()
+            context['threads'].append(process_thread)
     except Exception as e:
         tb = "".join(traceback.format_exc().split("\n"))
         app.logger.error(f'Error in test_cancelled callback: {tb}')
