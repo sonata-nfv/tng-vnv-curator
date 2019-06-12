@@ -570,8 +570,12 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
                 }
                 for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
             ]
+            if all([res['test_status']=='COMPLETED' for res in res_list]):
+                final_status = 'COMPLETED'
+            else:
+                final_status = 'ERROR'
             _LOG.debug(f'results for test_plan #{test_plan_uuid}: {res_list}')
-            planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='COMPLETED')
+            planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status=final_status)
             _LOG.debug(f'Response from planner: {planner_resp}')
             # if planner_resp ok, clean test_preparations entry
             del context['test_preparations'][test_plan_uuid]

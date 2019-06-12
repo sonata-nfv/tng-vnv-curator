@@ -362,12 +362,19 @@ def test_cancelled(test_plan_uuid, test_uuid):
                 app.logger.warning(f'Test {test_uuid} appears to be canceled or non-existent')
         else:
             app.logger.debug(f'Executor reported some error while cancelling test #{test_uuid}')
-            context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
+            context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
+            if test_uuid not in [result_entry['test_uuid'] for result_entry in context['test_preparations'][test_plan_uuid]['test_results']]:
+                context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
+            else:
+                for idx, item in enumerate(context['test_preparations'][test_plan_uuid]['test_results']):
+                    if test_uuid == item['test_uuid']:
+                        context['test_preparations'][test_plan_uuid]['test_results'][idx] = payload
+                        break
+
             if test_uuid in context['events'][test_plan_uuid]:
                 context['events'][test_plan_uuid][test_uuid].set()
             else:
                 app.logger.warning(f'Test {test_uuid} appears to be canceled or non-existent, or test failed')
-            context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
             process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, request.get_json(),))
             process_thread.start()
             context['threads'].append(process_thread)
