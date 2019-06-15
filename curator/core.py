@@ -261,7 +261,7 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
             context['test_preparations'][test_plan_uuid]['augmented_descriptors'].append(
                 {
                     'nsi_uuid': None,
-                    'platform_type': 'unknown',
+                    'platform': {'platform_type': 'unknown'},
                     'functions': None,
                     'nsi_name': instance_name,
                     'error': payload['error']
@@ -274,7 +274,7 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
             context['test_preparations'][test_plan_uuid]['augmented_descriptors'].append(
                 {
                     'nsi_uuid': None,
-                    'platform_type': 'unknown',
+                    'platform': {'platform_type': 'unknown'},
                     'functions': None,
                     'nsi_name': instance_name,
                     'error': 'Unknown error'
