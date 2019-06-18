@@ -209,18 +209,21 @@ def process_test_plan(test_plan_uuid):
                 enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
                 if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
             ]
-            (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-                [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
-                    if 'package_uploaded' in inst_result else False
             if len(instantiation_params) < 1:
-                error_params = instantiation_params = [
+                error_params = [
                     (p_index, augd) for p_index, augd in
                     enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
                     if augd['error'] and augd['nsi_name'] == instance_name
                 ]
                 if error_params:
                     _LOG.error(f'Received error from PA: {error_params}')
+                    (context['test_preparations'][test_plan_uuid]
+                        ['augmented_descriptors'][error_params[0]]['test_status']) = 'ERROR'
                     # Prepare callback to planner
+
+            (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+            [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
+                if 'package_uploaded' in inst_result else False
             if 'testd_uuid' not in context['test_preparations'][test_plan_uuid]:
                 test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
                 if len(test_cat) == 0:
@@ -247,17 +250,17 @@ def process_test_plan(test_plan_uuid):
                 _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
                 ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
                 (context['test_preparations'][test_plan_uuid]
-                    ['augmented_descriptors'][instantiation_params[0][0]]
-                    ['platform']['name']) = service_platform['name']
+                ['augmented_descriptors'][instantiation_params[0][0]]
+                ['platform']['name']) = service_platform['name']
                 (context['test_preparations'][test_plan_uuid]
-                    ['augmented_descriptors'][instantiation_params[0][0]]
-                    ['tdi']) = test_descriptor_instance
+                ['augmented_descriptors'][instantiation_params[0][0]]
+                ['tdi']) = test_descriptor_instance
                 (context['test_preparations'][test_plan_uuid]
-                    ['augmented_descriptors'][instantiation_params[0][0]]
-                    ['test_uuid']) = ex_response['test_uuid']
+                ['augmented_descriptors'][instantiation_params[0][0]]
+                ['test_uuid']) = ex_response['test_uuid']
                 (context['test_preparations'][test_plan_uuid]
-                    ['augmented_descriptors'][instantiation_params[0][0]]
-                    ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
+                ['augmented_descriptors'][instantiation_params[0][0]]
+                ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
                 # del context['events'][test_plan_uuid][instance_name]
                 _LOG.debug(f'Response from executor: {ex_response}')
 
@@ -265,9 +268,9 @@ def process_test_plan(test_plan_uuid):
                 tb = "".join(traceback.format_exc().split("\n"))
                 _LOG.error(f'Error during test execution: {tb}')
                 (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
-                    ['test_status']) = 'ERROR'
+                ['test_status']) = 'ERROR'
                 (context['test_preparations'][test_plan_uuid]['augmented_descriptors'][instantiation_params[0][0]]
-                    ['error']) = tb
+                ['error']) = tb
             # # Wait for executor callback (?)
             # context['events'][instance_name].set()
             # context['events'][instance_name].wait()
@@ -356,19 +359,20 @@ def process_test_plan(test_plan_uuid):
                 enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
                 if augd['platform']['platform_type'] == platform_type.lower() and not augd['error']
             ]
-            (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-                [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
-                    if 'package_uploaded' in inst_result else False
             if len(instantiation_params) < 1:
-                error_params = instantiation_params = [
+                error_params = [
                     (p_index, augd) for p_index, augd in
                     enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
                     if augd['error'] and augd['nsi_name'] == instance_name
                 ]
                 if error_params:
                     _LOG.error(f'Received error from PA: {error_params}')
+                    (context['test_preparations'][test_plan_uuid]
+                        ['augmented_descriptors'][error_params[0]]['test_status']) = 'ERROR'
                     # Prepare callback to planner
-
+            (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
+                    if 'package_uploaded' in inst_result else False
             if 'testd_uuid' not in context['test_preparations'][test_plan_uuid]:
                 test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
                 if len(test_cat) == 0:
