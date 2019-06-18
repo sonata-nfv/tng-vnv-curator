@@ -250,17 +250,17 @@ def process_test_plan(test_plan_uuid):
                 _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
                 ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
                 (context['test_preparations'][test_plan_uuid]
-                ['augmented_descriptors'][instantiation_params[0][0]]
-                ['platform']['name']) = service_platform['name']
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['platform']['name']) = service_platform['name']
                 (context['test_preparations'][test_plan_uuid]
-                ['augmented_descriptors'][instantiation_params[0][0]]
-                ['tdi']) = test_descriptor_instance
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['tdi']) = test_descriptor_instance
                 (context['test_preparations'][test_plan_uuid]
-                ['augmented_descriptors'][instantiation_params[0][0]]
-                ['test_uuid']) = ex_response['test_uuid']
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['test_uuid']) = ex_response['test_uuid']
                 (context['test_preparations'][test_plan_uuid]
-                ['augmented_descriptors'][instantiation_params[0][0]]
-                ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
                 # del context['events'][test_plan_uuid][instance_name]
                 _LOG.debug(f'Response from executor: {ex_response}')
 
@@ -399,17 +399,17 @@ def process_test_plan(test_plan_uuid):
                 _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
                 ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
                 (context['test_preparations'][test_plan_uuid]
-                ['augmented_descriptors'][instantiation_params[0][0]]
-                ['platform']['name']) = service_platform['name']
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['platform']['name']) = service_platform['name']
                 (context['test_preparations'][test_plan_uuid]
-                ['augmented_descriptors'][instantiation_params[0][0]]
-                ['tdi']) = test_descriptor_instance
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['tdi']) = test_descriptor_instance
                 (context['test_preparations'][test_plan_uuid]
-                ['augmented_descriptors'][instantiation_params[0][0]]
-                ['test_uuid']) = ex_response['test_uuid']
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['test_uuid']) = ex_response['test_uuid']
                 (context['test_preparations'][test_plan_uuid]
-                ['augmented_descriptors'][instantiation_params[0][0]]
-                ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
+                    ['augmented_descriptors'][instantiation_params[0][0]]
+                    ['test_status']) = ex_response['status'] if 'status' in ex_response.keys() else 'UNKNOWN'
                 # del context['events'][test_plan_uuid][instance_name]
                 _LOG.debug(f'Response from executor: {ex_response}')
 

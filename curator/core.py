@@ -211,7 +211,7 @@ def test_plan_cancelled(test_plan_uuid):
     elif request.method == 'DELETE':
         app.logger.debug(f'Cancelling test_plan {test_plan_uuid}')
         if test_plan_uuid not in context['test_preparations']:
-            make_response(
+            return make_response(
                 '{"exception":"Test-plan requested for cancellation is not currently executing", "status":"ERROR"}',
                 NOT_FOUND,
                 {'Content-Type': 'application/json'}
@@ -345,7 +345,7 @@ def test_cancelled(test_plan_uuid, test_uuid):
     try:
         payload = request.get_json()
         if test_plan_uuid not in context['test_preparations']:
-            make_response(
+            return make_response(
                 '{"exception":"Test-plan requested for cancellation is not currently executing", "status":"ERROR"}',
                 NOT_FOUND,
                 {'Content-Type': 'application/json'}
