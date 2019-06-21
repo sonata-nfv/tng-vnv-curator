@@ -33,8 +33,8 @@ from curator.interfaces.interface import Interface
 from curator.database import context
 from curator.logger import TangoLogger
 
-# _LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
-_LOG = logging.getLogger('flask.app')
+_LOG = TangoLogger.getLogger('curator:interfaces', log_level=logging.DEBUG, log_json=True)
+# _LOG = logging.getLogger('flask.app')
 
 # States: STARTING, COMPLETED, CANCELLING, CANCELLED, ERROR
 
@@ -269,67 +269,6 @@ class PlatformAdapterInterface(Interface):
             _LOG.exception(e)
             raise e
 
-    def instantiate_service_sonata(self, service_platform, service_uuid,
-                                   name, test_plan_uuid, test_uuid):
-        """
-        **************************************************
-        ** DEPRECATED BY automated_instantiation_sonata **
-        **************************************************
-        POST /tng-vnv-platform-mngr/adapters/<service_platform>/instantiations
-            {
-                "service_uuid":"86970b5e-0064-457e-b145-22ff13e08f65"
-            }
-
-        IS SYNCHRONOUS
-
-        EXAMPLE GOOD RESP:
-        {
-            "id":"4537e905-5183-4d96-bb31-3860121e21df", <- id in /adapters/qual-sp-bcn/instantiations/4537e905-5183-4d96-bb31-3860121e21df
-            "created_at":"2019-03-20T20:31:57.564Z",
-            "updated_at":"2019-03-20T20:31:57.564Z",
-            "status":"NEW",
-            "request_type":"CREATE_SERVICE",
-            "instance_uuid":null, <- instance_uuid is nsr
-            "ingresses":"[]",
-            "egresses":"[]",
-            "callback":"",
-            "blacklist":"[]",
-            "customer_uuid":null,
-            "sla_id":null,
-            "name":null,
-            "error":null,
-            "description":null,
-            "service":{
-                "uuid":"c8dfa216-c1bd-46da-ac8a-fa3fb444cc16",
-                "vendor":"eu.5gtango",
-                "name":"ns-squid-haproxy",
-                "version":"0.2"
-            }
-        }
-        EXAMPLE BAD RESP:
-        {"error": "Error saving request"}
-        :param platform:
-        :param uuid:
-        :return: dictionary
-        """
-        headers = {"Content-type": "application/json"}
-        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
-        data = {
-            "service_uuid": service_uuid,
-            "name": name,
-            "callback": '/'.join(['http:/', context['host'], self.own_api_root, self.own_api_version,
-                                  'test-preparations', test_plan_uuid, 'tests', test_uuid, 'sp-ready'])
-        }
-        try:
-            response = requests.post(url, headers=headers, json=data)
-            if response.status_code == 200:
-                return response.json()
-            elif response.status_code == 404:
-                raise FileNotFoundError
-        except Exception as e:
-            _LOG.exception(e)
-            raise e
-
     def automated_instantiation_sonata(self, service_platform,
                                        service_name, service_vendor, service_version,
                                        instance_name, test_plan_uuid):
@@ -370,9 +309,13 @@ class PlatformAdapterInterface(Interface):
                 raise FileNotFoundError(response.json)
             else:
                 raise Exception(response.json())
+        except json.decoder.JSONDecodeError as e:
+            msg = f'Wrong JSON from PA: {response.raw}, exception: {e}'
+            _LOG.error(msg)
+            return {'error': msg}
         except Exception as e:
             _LOG.exception(e)
-            raise e
+            return {'error': e}
 
     def automated_instantiation_osm(self, service_platform,
                                        service_name, service_vendor, service_version,
@@ -414,24 +357,13 @@ class PlatformAdapterInterface(Interface):
                 raise FileNotFoundError(response.json)
             else:
                 raise Exception(response.json())
+        except json.decoder.JSONDecodeError as e:
+            msg = f'Wrong JSON from PA: {response.raw}, exception: {e}'
+            _LOG.error(msg)
+            return {'error': msg}
         except Exception as e:
             _LOG.exception(e)
-            raise e
-
-    def instantiate_service_osm(self, service_platform, nsd_name, ns_name, vim_account, instance_name):
-        """
-        POST tng-vnv-platform-mngr/adapters/<service_platform>/instantiations
-        {
-            "nsd_name" : "test_nsd",
-            "ns_name" : "test_ns",
-            "vim_account" : "OS127",
-            "callback": "http://my_callback_url:6666" (OPTIONAL)
-        }
-        :param platform:
-        :param uuid:
-        :return:
-        """
-        url = '/'.join([self.base_url, 'adapters', service_platform, 'instantiations'])
+            return {'error': e}
 
     def shutdown_package(self, service_platform, instance_uuid, package_uploaded):
         """
@@ -455,9 +387,14 @@ class PlatformAdapterInterface(Interface):
                 return response.json()
             elif response.status_code == 404:
                 raise FileNotFoundError
+        except json.decoder.JSONDecodeError as e:
+            msg = f'Wrong JSON from PA: {response.raw}, exception: {e}'
+            _LOG.error(msg)
+            return {'error': msg}
         except Exception as e:
             _LOG.exception(e)
-            raise e
+            return {'error': e}
+
 
     def upload_package(self, platform, package_file_uuid):
         """

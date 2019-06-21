@@ -27,7 +27,7 @@
 
 
 from flask import Flask, session, request, Response, json, url_for, make_response, g
-from flask_log_request_id import RequestID, current_request_id, RequestIDLogFilter
+# from flask_log_request_id import RequestID, current_request_id, RequestIDLogFilter
 import logging.config
 import logging
 import requests
@@ -39,7 +39,6 @@ import uuid
 from curator.interfaces.vnv_components_interface import PlannerInterface, ExecutorInterface, PlatformAdapterInterface
 from curator.interfaces.common_databases_interface import CatalogueInterface
 from curator.interfaces.docker_interface import DockerInterface
-from curator.worker import Worker
 from curator.helpers import process_test_plan, cancel_test_plan, clean_environment
 import time
 from curator.logger import TangoLogger
@@ -51,17 +50,17 @@ import traceback
 #     app.logger.debug('completed ' + test_plan)
 #     return 'completed'
 app = Flask(__name__)
-app.app_context()
-RequestID(app)
+# app.app_context()
+# RequestID(app)
 
 # Setup logging
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter("[%(asctime)s] %(name)s %(levelname)s %(module)s.%(funcName)s "
-                                       "[req_%(request_id)s] - %(message)s"))
-handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
-logging.getLogger().addHandler(handler)
+# handler = logging.StreamHandler()
+# handler.setFormatter(logging.Formatter("[%(asctime)s] %(name)s %(levelname)s %(module)s.%(funcName)s "
+#                                        "[req_%(request_id)s] - %(message)s"))
+# handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
+# logging.getLogger().addHandler(handler)
 
-# _LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
+_LOG = TangoLogger.getLogger('curator:core', log_level=logging.DEBUG, log_json=True)
 # _LOG = logging.getLogger('flask.app')
 
 API_ROOT = "api"
@@ -132,7 +131,9 @@ def handle_new_test_plan():
             {'Content-Type': 'application/json'}
         )
     elif request.method == 'POST':
-        app.logger.debug(f'New test plan received, contains {request.get_data()}, '
+        # app.logger.debug(f'New test plan received, contains {request.get_data()}, '
+        #                  f'Content-type: {request.headers["Content-type"]}')
+        _LOG.debug(f'New test plan received, contains {request.get_data()}, '
                          f'Content-type: {request.headers["Content-type"]}')
         if request.headers["Content-type"].split(';')[0] != 'application/json':
             return make_response(json.dumps({'exception': 'A valid JSON payload is required', 'status': 'ERROR'}), NOT_ACCEPTABLE,
@@ -142,16 +143,19 @@ def handle_new_test_plan():
         required_keys = {'nsd_uuid', 'testd_uuid', 'test_plan_callbacks'}
         try:
             payload = request.get_json()
-            app.logger.debug(f'Received JSON: {payload}')
+            # app.logger.debug(f'Received JSON: {payload}')
+            _LOG.debug(f'Received JSON: {payload}')
             if all(key in payload.keys() for key in required_keys):
                 missing_content_msg = 'Missing '
                 missing_content_msg_len = len(missing_content_msg)
                 if 'test_plan_uuid' not in payload.keys():
                     new_uuid = str(uuid.uuid4())  # Generate internal uuid ftm
-                    app.logger.warning(f'There was no test_plan_uuid in payload, generated #{new_uuid}')
+                    # app.logger.warning(f'There was no test_plan_uuid in payload, generated #{new_uuid}')
+                    _LOG.warning(f'There was no test_plan_uuid in payload, generated #{new_uuid}')
                 else:
                     new_uuid = payload['test_plan_uuid']
-                    app.logger.debug(f'Received new test plan #{new_uuid}')
+                    # app.logger.debug(f'Received new test plan #{new_uuid}')
+                    _LOG.debug(f'Received new test plan #{new_uuid}')
                 for key in required_keys:
                     if payload[key] is None:
                         missing_content_msg += f'{key} content, '
@@ -170,7 +174,8 @@ def handle_new_test_plan():
                     context['test_preparations'][new_uuid] = payload  # Should have
                 else:
                     msg = f'test-plan ({new_uuid}) exists, aborting'
-                    app.logger.error(msg)
+                    # app.logger.error(msg)
+                    _LOG.error(msg)
                     return make_response(
                         json.dumps({'exception': msg, 'status': 'ERROR'}),
                         BAD_REQUEST,
@@ -209,9 +214,10 @@ def test_plan_cancelled(test_plan_uuid):
             {'Content-Type': 'application/json'}
         )
     elif request.method == 'DELETE':
-        app.logger.debug(f'Cancelling test_plan {test_plan_uuid}')
+        _LOG.debug(f'Cancelling test_plan {test_plan_uuid}')
+        # app.logger.debug(f'Cancelling test_plan {test_plan_uuid}')
         if test_plan_uuid not in context['test_preparations']:
-            make_response(
+            return make_response(
                 '{"exception":"Test-plan requested for cancellation is not currently executing", "status":"ERROR"}',
                 NOT_FOUND,
                 {'Content-Type': 'application/json'}
@@ -234,14 +240,16 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
     :return:
     """
     # Notify SP setup blocked thread
-    app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+    # app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+    #                  f'Content-type: {request.headers["Content-type"]}')
+    _LOG.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                      f'Content-type: {request.headers["Content-type"]}')
     try:
         payload = request.get_json()
         context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         # payload = json.loads(request.get_data().decode("UTF-8"))
-        # _LOG.debug(f'Callback received, contains {payload}')
-        app.logger.debug(f'Callback received, contains {payload}')
+        _LOG.debug(f'Callback received, contains {payload}')
+        # app.logger.debug(f'Callback received, contains {payload}')
         required_keys = {'ns_instance_uuid', 'functions', 'platform_type'}
         if all(key in payload.keys() for key in required_keys) and 'error' not in payload.keys():
             # FIXME: Check which entry contains the corresponding type of platform (with nsi_name)
@@ -261,7 +269,7 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
             context['test_preparations'][test_plan_uuid]['augmented_descriptors'].append(
                 {
                     'nsi_uuid': None,
-                    'platform_type': 'unknown',
+                    'platform': {'platform_type': 'unknown'},
                     'functions': None,
                     'nsi_name': instance_name,
                     'error': payload['error']
@@ -274,7 +282,7 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
             context['test_preparations'][test_plan_uuid]['augmented_descriptors'].append(
                 {
                     'nsi_uuid': None,
-                    'platform_type': 'unknown',
+                    'platform': {'platform_type': 'unknown'},
                     'functions': None,
                     'nsi_name': instance_name,
                     'error': 'Unknown error'
@@ -300,7 +308,9 @@ def test_in_execution(test_plan_uuid):
     :param test_plan_uuid:
     :return:
     """
-    app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+    # app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+    #                  f'Content-type: {request.headers["Content-type"]}')
+    _LOG.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                      f'Content-type: {request.headers["Content-type"]}')
     try:
         executor_payload = request.get_json()
@@ -322,7 +332,9 @@ def test_in_execution(test_plan_uuid):
     methods=['POST'])
 def test_finished(test_plan_uuid, test_uuid):
     try:
-        app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+        # app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+        #                  f'Content-type: {request.headers["Content-type"]}')
+        _LOG.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                          f'Content-type: {request.headers["Content-type"]}')
         context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, request.get_json(),))
@@ -330,7 +342,8 @@ def test_finished(test_plan_uuid, test_uuid):
         context['threads'].append(process_thread)
     except Exception as e:
         tb = "".join(traceback.format_exc().split("\n"))
-        app.logger.error(f'Error in test_finished callback: {tb}')
+        # app.logger.error(f'Error in test_finished callback: {tb}')
+        _LOG.error(f'Error in test_finished callback: {tb}')
         return make_response(json.dumps({'error': tb}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
@@ -340,22 +353,55 @@ def test_finished(test_plan_uuid, test_uuid):
     methods=['POST'])
 def test_cancelled(test_plan_uuid, test_uuid):
     # Wrap up, notify
-    app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+    # app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
+    #                  f'Content-type: {request.headers["Content-type"]}')
+    _LOG.debug(f'Callback received {request.path}, contains {request.get_data()}, '
                      f'Content-type: {request.headers["Content-type"]}')
     try:
         payload = request.get_json()
+        if test_plan_uuid not in context['test_preparations']:
+            return make_response(
+                '{"exception":"Test-plan requested for cancellation is not currently executing", "status":"ERROR"}',
+                NOT_FOUND,
+                {'Content-Type': 'application/json'}
+            )
         context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         if payload['status'] != 'ERROR':
-            app.logger.debug(f'Test #{test_uuid} cancellation was correct on executor')
+            # app.logger.debug(f'Test #{test_uuid} cancellation was correct on executor')
+            _LOG.debug(f'Test #{test_uuid} cancellation was correct on executor')
+            context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
             context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
-            context['events'][test_plan_uuid][test_uuid].set()
+            if test_uuid in context['events'][test_plan_uuid]:
+                # app.logger.warning(f'Resuming test {test_uuid} cancelation process')
+                _LOG.warning(f'Resuming test {test_uuid} cancelation process')
+                context['events'][test_plan_uuid][test_uuid].set()
+            else:
+                # app.logger.warning(f'Test {test_uuid} appears to be canceled or non-existent')
+                _LOG.warning(f'Test {test_uuid} appears to be canceled or non-existent')
         else:
-            app.logger.debug(f'Executor reported some error while cancelling test #{test_uuid}')
-            context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
-            context['events'][test_plan_uuid][test_uuid].set()
+            # app.logger.debug(f'Executor reported some error while cancelling test #{test_uuid}')
+            _LOG.debug(f'Executor reported some error while cancelling test #{test_uuid}')
+            context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
+            if test_uuid not in [result_entry['test_uuid'] for result_entry in context['test_preparations'][test_plan_uuid]['test_results']]:
+                context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
+            else:
+                for idx, item in enumerate(context['test_preparations'][test_plan_uuid]['test_results']):
+                    if test_uuid == item['test_uuid']:
+                        context['test_preparations'][test_plan_uuid]['test_results'][idx] = payload
+                        break
+
+            if test_uuid in context['events'][test_plan_uuid]:
+                context['events'][test_plan_uuid][test_uuid].set()
+            else:
+                # app.logger.warning(f'Test {test_uuid} appears to be canceled or non-existent, or test failed')
+                _LOG.warning(f'Test {test_uuid} appears to be canceled or non-existent, or test failed')
+            process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, request.get_json(),))
+            process_thread.start()
+            context['threads'].append(process_thread)
     except Exception as e:
         tb = "".join(traceback.format_exc().split("\n"))
-        app.logger.error(f'Error in test_cancelled callback: {tb}')
+        # app.logger.error(f'Error in test_cancelled callback: {tb}')
+        _LOG.error(f'Error in test_cancelled callback: {tb}')
         return make_response(json.dumps({'error': tb}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
     return make_response('{"error": null}', OK, {'Content-Type': 'application/json'})
 
@@ -396,22 +442,31 @@ def configure_mock():
 def dummy_endpoint():
     try:
         if request.method == 'GET':
-            app.logger.debug(f'args: {request.args}')
-            app.logger.debug(f'path: {request.path}')
-            app.logger.debug(f'full_path: {request.full_path}')
-            app.logger.debug(f'url: {request.url}')
+            # app.logger.debug(f'args: {request.args}')
+            # app.logger.debug(f'path: {request.path}')
+            # app.logger.debug(f'full_path: {request.full_path}')
+            # app.logger.debug(f'url: {request.url}')
+            _LOG.debug(f'args: {request.args}')
+            _LOG.debug(f'path: {request.path}')
+            _LOG.debug(f'full_path: {request.full_path}')
+            _LOG.debug(f'url: {request.url}')
             return make_response('{"error": null}, {"message": "hello"}', OK, {'Content-Type': 'application/json'})
         elif request.method == 'POST':
-            app.logger.debug(f'headers: {request.headers}')
-            app.logger.debug(f'data:{request.get_data()}')
+            # app.logger.debug(f'headers: {request.headers}')
+            # app.logger.debug(f'data:{request.get_data()}')
+            _LOG.debug(f'headers: {request.headers}')
+            _LOG.debug(f'data:{request.get_data()}')
             if request.headers['Content-type'] == 'application/json':
-                app.logger.debug(f'Content-type is json encoded! Content: {request.get_json()}')
+                # app.logger.debug(f'Content-type is json encoded! Content: {request.get_json()}')
+                _LOG.debug(f'Content-type is json encoded! Content: {request.get_json()}')
             else:
                 try:
-                    app.logger.debug(f'Content-type is NOT json encoded but it is json compatible, '
+                    # app.logger.debug(f'Content-type is NOT json encoded but it is json compatible, '
+                    _LOG.debug(f'Content-type is NOT json encoded but it is json compatible, '
                                      f'Content: {json.loads(request.get_data().decode("UTF-8"))}')
                 except:
-                    app.logger.debug(f'Data is not Json Serializable, Content: {request.get_data()}')
+                    # app.logger.debug(f'Data is not Json Serializable, Content: {request.get_data()}')
+                    _LOG.debug(f'Data is not Json Serializable, Content: {request.get_data()}')
 
             return make_response(request.get_data(), OK, {'Content-type': request.headers['Content-type']})
         else:
@@ -428,10 +483,10 @@ def not_found(error):
 
 @app.after_request
 def after_request(response):
-    app.logger.info(f'{request.remote_addr} {request.scheme} {request.method}'
-    # _LOG.info(f'{request.remote_addr} {request.scheme} {request.method}'
-                    f' {request.full_path} {response.status} {response.content_length}')
-    response.headers.add('X-REQUEST-ID', current_request_id())
+    # app.logger.info(f'{request.remote_addr} {request.scheme} {request.method}'
+    _LOG.info(f'{request.remote_addr} {request.scheme} {request.method}'
+              f' {request.full_path} {response.status} {response.content_length}')
+    # response.headers.add('X-REQUEST-ID', current_request_id())
     return response
 
 
