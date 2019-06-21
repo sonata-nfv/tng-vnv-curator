@@ -27,7 +27,7 @@
 
 
 from flask import Flask, session, request, Response, json, url_for, make_response, g
-from flask_log_request_id import RequestID, current_request_id, RequestIDLogFilter
+# from flask_log_request_id import RequestID, current_request_id, RequestIDLogFilter
 import logging.config
 import logging
 import requests
@@ -60,7 +60,7 @@ app = Flask(__name__)
 # handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
 # logging.getLogger().addHandler(handler)
 
-_LOG = TangoLogger.getLogger('sonata', log_level=logging.DEBUG, log_json=True)
+_LOG = TangoLogger.getLogger('curator', log_level=logging.DEBUG, log_json=True)
 # _LOG = logging.getLogger('flask.app')
 
 API_ROOT = "api"

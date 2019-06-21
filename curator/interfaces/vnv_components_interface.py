@@ -33,7 +33,7 @@ from curator.interfaces.interface import Interface
 from curator.database import context
 from curator.logger import TangoLogger
 
-_LOG = TangoLogger.getLogger('sonata', log_level=logging.DEBUG, log_json=True)
+_LOG = TangoLogger.getLogger('curator', log_level=logging.DEBUG, log_json=True)
 # _LOG = logging.getLogger('flask.app')
 
 # States: STARTING, COMPLETED, CANCELLING, CANCELLED, ERROR
