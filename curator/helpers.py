@@ -39,7 +39,7 @@ import traceback
 from curator.logger import TangoLogger
 
 
-_LOG = TangoLogger.getLogger('curator', log_level=logging.DEBUG, log_json=True)
+_LOG = TangoLogger.getLogger('curator:backend', log_level=logging.DEBUG, log_json=True)
 # _LOG = logging.getLogger('flask.app')
 
 
