@@ -486,7 +486,7 @@ def after_request(response):
     # app.logger.info(f'{request.remote_addr} {request.scheme} {request.method}'
     _LOG.info(f'{request.remote_addr} {request.scheme} {request.method}'
               f' {request.full_path} {response.status} {response.content_length}')
-    response.headers.add('X-REQUEST-ID', current_request_id())
+    # response.headers.add('X-REQUEST-ID', current_request_id())
     return response
 
 
