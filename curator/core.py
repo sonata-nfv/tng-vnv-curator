@@ -50,8 +50,8 @@ import traceback
 #     app.logger.debug('completed ' + test_plan)
 #     return 'completed'
 app = Flask(__name__)
-app.app_context()
-RequestID(app)
+# app.app_context()
+# RequestID(app)
 
 # Setup logging
 # handler = logging.StreamHandler()
@@ -60,7 +60,7 @@ RequestID(app)
 # handler.addFilter(RequestIDLogFilter())  # << Add request id contextual filter
 # logging.getLogger().addHandler(handler)
 
-_LOG = TangoLogger.getLogger('flask.app', log_level=logging.DEBUG, log_json=True)
+_LOG = TangoLogger.getLogger('sonata', log_level=logging.DEBUG, log_json=True)
 # _LOG = logging.getLogger('flask.app')
 
 API_ROOT = "api"
