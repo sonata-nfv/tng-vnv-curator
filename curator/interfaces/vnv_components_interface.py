@@ -444,16 +444,18 @@ class ExecutorInterface(Interface):
         self.api = 'api'
         self.events = []
 
-    def execution_request(self, tdi, test_plan_uuid):
+    def execution_request(self, tdi, test_plan_uuid, service_instantiation_time=None):
         """
 
         :param tdi:
         :param test_plan_uuid:
+        :param service_instantiation_time:
         :return:
         """
         # TODO: Specify content in the callbacks?
         data = {
             'test': tdi,
+            'service-instantiation-time': service_instantiation_time,
             "callbacks": [
                 {
                     'name': 'running',
