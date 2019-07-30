@@ -250,11 +250,11 @@ def process_test_plan(test_plan_uuid):
                         test_uuid=context['test_preparations'][test_plan_uuid]['testd_uuid'],
                         service_uuid=context['test_preparations'][test_plan_uuid]['nsd_uuid'],
                         package_uuid=inst_result['package_id'],
-                        instance_uuid=instantiation_params[0][1]['nsi_uuid'],
-                        service_instantiation_time=instantiation_end - instantiation_init
+                        instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
-                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
+                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid,
+                                                             service_instantiation_time=instantiation_end-instantiation_init)
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['platform']['name']) = service_platform['name']
@@ -405,11 +405,11 @@ def process_test_plan(test_plan_uuid):
                         test_uuid=context['test_preparations'][test_plan_uuid]['testd_uuid'],
                         service_uuid=context['test_preparations'][test_plan_uuid]['nsd_uuid'],
                         package_uuid=inst_result['package_id'],
-                        instance_uuid=instantiation_params[0][1]['nsi_uuid'],
-                        service_instantiation_time=instantiation_end-instantiation_init
+                        instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
-                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
+                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid,
+                                                             service_instantiation_time=instantiation_end-instantiation_init)
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['platform']['name']) = service_platform['name']
@@ -717,8 +717,7 @@ def cancel_test_plan(test_plan_uuid):
 
 def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
                                       test_uuid=None, service_uuid=None,
-                                      package_uuid=None, instance_uuid=None,
-                                      service_instantiation_time=None):
+                                      package_uuid=None, instance_uuid=None):
     """
     This method searchs for parameters to be written with instantiation parameters and then writes them into the
     augmented descriptor, and returns it
@@ -728,7 +727,6 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
     :param service_uuid:
     :param package_uuid:
     :param instance_uuid:
-    :param service_instantiation_time:
     :return:
     """
     _LOG.debug(f'Parsing instantiation parameters, {vars()}')
@@ -762,7 +760,6 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
     test_descriptor['package_descriptor_uuid'] = package_uuid
     test_descriptor['network_service_descriptor_uuid'] = service_uuid
     test_descriptor['service_instance_uuid'] = instance_uuid
-    test_descriptor['service_instantiation_time'] = service_instantiation_time
     _LOG.debug(test_descriptor)
     return test_descriptor
 
