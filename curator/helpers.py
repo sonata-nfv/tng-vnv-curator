@@ -163,6 +163,7 @@ def process_test_plan(test_plan_uuid):
             _LOG.debug(f'Instantiating nsd {nsd["vendor"]}:{nsd["name"]}:{nsd["version"]}, '
                        f'in {service_platform["name"]}')
             instance_name = f"{td['name']}-{nsd['name']}-{service_platform['name']}"
+            instantiation_init = time.time()
             inst_result = platform_adapter.automated_instantiation_sonata(
                 service_platform['name'],
                 nsd['name'], nsd['vendor'], nsd['version'],
@@ -204,6 +205,7 @@ def process_test_plan(test_plan_uuid):
                 _LOG.debug(f'Waiting for event {test_plan_uuid}.{instance_name}, '
                            f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
                 context["events"][test_plan_uuid][instance_name].wait()
+                instantiation_end = time.time()
                 del context['events'][test_plan_uuid][instance_name]
                 _LOG.debug(f"Received parameters from SP: "
                            f"{context['test_preparations'][test_plan_uuid]['augmented_descriptors']}")
@@ -251,7 +253,8 @@ def process_test_plan(test_plan_uuid):
                         instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
-                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
+                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid,
+                                                             service_instantiation_time=instantiation_end-instantiation_init)
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['platform']['name']) = service_platform['name']
@@ -313,6 +316,7 @@ def process_test_plan(test_plan_uuid):
                        f'{nsd["version"]}, '
                        f'in {service_platform["name"]}')
             instance_name = f'{td["name"]}-{nsd["name"]}-{service_platform["name"]}'
+            instantiation_init = time.time()
             inst_result = platform_adapter.automated_instantiation_osm(
                 service_platform['name'],
                 nsd['name'],
@@ -357,6 +361,7 @@ def process_test_plan(test_plan_uuid):
                 _LOG.debug(f'Waiting for event {test_plan_uuid}.{instance_name}, '
                            f'E({context["events"][test_plan_uuid][instance_name].is_set()})')
                 context["events"][test_plan_uuid][instance_name].wait()
+                instantiation_end = time.time()
                 del context['events'][test_plan_uuid][instance_name]
                 _LOG.debug(f"Received parameters from SP: "
                            f"{context['test_preparations'][test_plan_uuid]['augmented_descriptors']}")
@@ -403,7 +408,8 @@ def process_test_plan(test_plan_uuid):
                         instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
-                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid)
+                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid,
+                                                             service_instantiation_time=instantiation_end-instantiation_init)
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['platform']['name']) = service_platform['name']
@@ -682,12 +688,15 @@ def cancel_test_plan(test_plan_uuid):
         _LOG.debug(f'Response from planner (Errback): {planner_resp}')
 
     # Remove probe images
-    for probe in context['test_preparations'][test_plan_uuid]['probes']:
-        try:
-            _LOG.debug(f'Removing {probe["name"]}')
-            dockeri.rm_image(probe['image'])
-        except Exception as e:
-            _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
+    if 'probes' in context['test_preparations'][test_plan_uuid]:
+        for probe in context['test_preparations'][test_plan_uuid]['probes']:
+            try:
+                _LOG.debug(f'Removing {probe["name"]}')
+                dockeri.rm_image(probe['image'])
+            except Exception as e:
+                _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
+    else:
+        _LOG.warning(f'No probes for test plan {test_plan_uuid}')
 
     res_list = [
         {
@@ -740,7 +749,7 @@ def generate_test_descriptor_instance(test_descriptor, instantiation_parameters,
                             value = route_from_text(parameter, path[1:])
                             probe_param['value'] = value
                             break
-            not_parsed = [param['value']  for param in probe['parameters'] if param['value'].startswith('$(')]
+            not_parsed = [param['value'] for param in probe['parameters'] if param['value'].startswith('$(')]
             if not_parsed:
                 raise ValueError(f'Some probe parameters are not well referenced, {not_parsed}')
 
