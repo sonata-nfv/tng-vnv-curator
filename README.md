@@ -48,7 +48,7 @@ It is recommended to use the [quick guide](https://sonata-nfv.github.io/vnv-inst
 
 ### Built with
 
-Front end is developed in flask, and backend uses requests and docker api.
+Front end is developed in flask under python 3.6, and backend uses requests and docker api.
 
 The whole list of python libraries uses is included in setup.py:
 
@@ -58,7 +58,7 @@ The whole list of python libraries uses is included in setup.py:
  * requests
  * six
  * urllib3
- * psycopg2
+ * psycopg2-binary
  * coloredlogs
  
 ### Prerequisites
