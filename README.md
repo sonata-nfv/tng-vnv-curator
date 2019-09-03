@@ -20,7 +20,7 @@ It's important to use tests and network services compatible with each other. Tes
 ```
 $(<function name>/<path>/<object>
 ```
-Where _<function name>_ is the name of the VNF, _<path>_ is how it is addressed  in the instantiation parameters and _<object>_ is the desired record useful for the test.
+Where `<function name>` is the name of the VNF, `<path>` is how it is addressed in the instantiation parameters and `<object>` is the desired record useful for the test.
 
 
 ```shell
