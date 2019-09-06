@@ -1,0 +1,396 @@
+swagger: '2.0'
+info:
+  description: Api Documentation
+  version: '1.0'
+  title: Api Documentation
+  termsOfService: 'urn:tos'
+  contact: {}
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0'
+host: 'pre-int-vnv-bcn.5gtango.eu:6200'
+basePath: /
+schemes:
+  - http
+tags:
+  - name: test-preparations
+    description: Test preparation operations
+  - name: callbacks
+    description: Asynchronous callbacks from other modules
+paths:
+  /ping:
+    get:
+      tags:
+          - utils
+      summary: Get module startup time
+      description: Get module startup time
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: object
+            properties:
+              alive_since:
+                type: string
+                example: "2019-01-01T12:34:56Z"
+      deprecated: false
+  /api/v1/test-preparations:
+    get:
+      tags:
+          - test-preparations
+      summary: Get current test plans being curated
+      description: Get current test plans being curated
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/TestPreparation'
+      deprecated: false
+    post:
+      tags:
+        - test-preparations
+      summary: Launch a new test plan
+      description: Initiates a test plan - a nsd and a testd which should be compatible
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: body
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/TestPlan'
+        '400':
+          description: Bad Request
+        '404':
+          description: Could not find package with that packageId
+      deprecated: false
+  /api/v1/test-preparations/{test_plan_uuid}:
+    get:
+      tags:
+          - test-preparations
+      summary: Get a single test plan being curated
+      description: Get a single test plan being curated
+      produces:
+        - application/json
+      parameters:
+        - name: test_plan_uuid
+          in: path
+          description: uuid
+          required: true
+          type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/TestPreparation'
+      deprecated: false
+    delete:
+      tags:
+        - test-preparations
+      summary: Cancel a test plan
+      description: Canceling test plan by uuid while being curated
+      produces:
+        - '*/*'
+      parameters:
+        - name: test_plan_uuid
+          in: path
+          description: uuid
+          required: true
+          type: string
+      responses:
+        '200':
+          description: OK
+      deprecated: false
+  /api/v1/test-preparations/{test_plan_uuid}/service-instances/{instance_name}/sp-ready:
+    post:
+      tags:
+        - callbacks
+      summary: Start a test via package
+      description: Package uploaded notification received
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - name: test_plan_uuid
+          in: path
+          description: uuid
+          required: true
+          type: string
+        - name: instance_name
+          in: path
+          description: instance name
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: body
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/TestPlan'
+        '400':
+          description: Bad Request
+        '404':
+          description: Could not find package with that packageId
+      deprecated: false
+  /api/v1/test-preparations/{test_plan_uuid}/tests/{test_uuid}/finish:
+    post:
+      tags:
+        - callbacks
+      summary: Start a test via package
+      description: Package uploaded notification received
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - name: test_plan_uuid
+          in: path
+          description: uuid
+          required: true
+          type: string
+        - name: test_uuid
+          in: path
+          description: uuid
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: body
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/TestPlan'
+        '400':
+          description: Bad Request
+        '404':
+          description: Could not find package with that packageId
+      deprecated: false
+  /api/v1/test-preparations/{test_plan_uuid}/tests/{test_uuid}/cancel:
+    post:
+      tags:
+        - callbacks
+      summary: Start a test via package
+      description: Package uploaded notification received
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - name: test_plan_uuid
+          in: path
+          description: uuid
+          required: true
+          type: string
+        - name: test_uuid
+          in: path
+          description: uuid
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: body
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/TestPlan'
+        '400':
+          description: Bad Request
+        '404':
+          description: Could not find package with that packageId
+      deprecated: false
+  /api/v1/test-preparations/{test_plan_uuid}/change:
+    post:
+      tags:
+        - callbacks
+      summary: Start a test via package
+      description: Package uploaded notification received
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - name: test_plan_uuid
+          in: path
+          description: uuid
+          required: true
+          type: string
+        - in: body
+          name: body
+          description: body
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/TestPlan'
+        '400':
+          description: Bad Request
+        '404':
+          description: Could not find package with that packageId
+      deprecated: false
+definitions:
+  TestPreparation:
+    type: object
+    properties:
+        augmented_descriptors:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        testd_uuid:
+          type: string
+        nsd_uuid:
+          type: string
+        probes:
+          type: array
+          items:
+            type: string
+  CuratorCallback:
+    type: object
+    required:
+      - event_actor
+      - status
+      - test_plan_uuid
+    properties:
+      event_actor:
+        type: string
+        example: 'Curator, Executor'
+        description: Event Actor
+      exception:
+        type: string
+        example: run time exception
+        description: Test Plan Exception message
+      status:
+        type: string
+        example: 'STARTING, COMPLETED, CANCELLING, CANCELLED, ERROR'
+        description: Test Plan Status
+      test_plan_uuid:
+        type: string
+        description: Test Plan uuid
+      test_results:
+        type: array
+        description: Test Plan Result List
+        items:
+          $ref: '#/definitions/TestResult'
+    title: CuratorCallback
+  PackageCallback:
+    type: object
+    required:
+      - event_name
+      - package_id
+    properties:
+      confirm_required:
+        type: string
+        example: true
+        description: Additional validation step before every test plan progresses towards execution
+      event_name:
+        type: string
+        example: UPDATED
+        description: Event Name
+      package_id:
+        type: string
+        description: The reference id of the uploaded package that will generate test plans as pair of network services and tests
+      package_location:
+        type: string
+    title: PackageCallback
+  TestPlan:
+    type: object
+    properties:
+      confirm_required:
+        type: boolean
+        description: Does TestPlan require confirmation?
+      created_at:
+        type: string
+        format: date-time
+      description:
+        type: string
+        description: Description
+      service_name:
+        type: string
+        description: Network service name
+      service_uuid:
+        type: string
+        description: Network service uuid
+      test_name:
+        type: string
+        description: Test descriptor name
+      test_result_uuid:
+        type: string
+        description: Test result uuid
+      test_set_uuid:
+        type: string
+        description: Test Set uuid to which it belongs
+      test_status:
+        type: string
+        description: Test Status
+      test_uuid:
+        type: string
+        description: Test descriptor uuid
+      updated_at:
+        type: string
+        format: date-time
+      uuid:
+        type: string
+        description: Test Plan uuid
+    title: TestPlan
+  TestResult:
+    type: object
+    required:
+      - test_result_uuid
+      - test_status
+      - test_uuid
+    properties:
+      test_result_uuid:
+        type: string
+        description: Test result uuid
+      test_status:
+        type: string
+        example: 'STARTING, COMPLETED, CANCELLING, CANCELLED, ERROR'
+        description: Test Plan Status
+      test_uuid:
+        type: string
+        description: Test uuid
+    title: TestResult
