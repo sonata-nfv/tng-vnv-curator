@@ -30,6 +30,7 @@ import requests
 import json
 import logging
 import threading
+import random
 from curator.database import context
 import curator.interfaces.vnv_components_interface as vnv_i
 import curator.interfaces.common_databases_interface as db_i
@@ -151,7 +152,7 @@ def process_test_plan(test_plan_uuid):
         if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
             _LOG.info(f"Accesing {nsd_target}")
             platform_type = 'SONATA'
-            service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
+            service_platform = random.choice(platform_adapter.available_platforms_by_type(platform_type.lower()))
             # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
             # the nsd, I am keeping this previous block
             # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
@@ -302,7 +303,7 @@ def process_test_plan(test_plan_uuid):
         elif 'OSM' in platforms and nsd_target == 'osm':
             _LOG.info(f"Accesing {nsd_target}")
             platform_type = 'OSM'
-            service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
+            service_platform = random.choice(platform_adapter.available_platforms_by_type(platform_type.lower()))
             # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
             # the nsd, I am keeping this previous block
             # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
@@ -604,7 +605,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
                 }
                 for d in context['test_preparations'][test_plan_uuid]['test_results'] if d is not None
             ]
-            if all([res['test_status']=='COMPLETED' for res in res_list]):
+            if all([res['test_status'] == 'COMPLETED' for res in res_list]):
                 final_status = 'COMPLETED'
             else:
                 final_status = 'ERROR'
@@ -662,7 +663,7 @@ def cancel_test_plan(test_plan_uuid):
             context['events'][test_plan_uuid][test['test_uuid']].wait()
             del context['events'][test_plan_uuid][test['test_uuid']]
             # clean service platform
-            _LOG.debug(f'Cleanning up test #{test["test_uuid"]} environment')
+            _LOG.debug(f'Cleaning up test #{test["test_uuid"]} environment')
             pa_termination_response = platform_adapter.shutdown_package(
                 context['events'][test_plan_uuid][test['test_uuid']]['platform']['name'],
                 context['events'][test_plan_uuid][test['test_uuid']]['nsi_uuid'],
