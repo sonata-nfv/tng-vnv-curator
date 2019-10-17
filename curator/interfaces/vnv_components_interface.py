@@ -96,8 +96,10 @@ class PlatformAdapterInterface(Interface):
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
         self.base_url = os.getenv('platform_adapter_base')
-        self.running_instances = []
+        # self.running_instances = []
         self.events = []
+        self.osm_sp_usage_count = dict()
+        self.sonata_sp_usage_count = dict()
 
     def available_platforms(self):
         url = '/'.join([self.base_url, 'service_platforms'])
