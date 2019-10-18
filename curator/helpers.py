@@ -156,8 +156,8 @@ def process_test_plan(test_plan_uuid):
     if type(platforms) is list:
         if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
             _LOG.info(f"Accesing {nsd_target}")
-
             platform_type = 'SONATA'
+
             sp_list = platform_adapter.available_platforms_by_type(platform_type.lower())
             if not sp_list:
                 err_msg = f'No available platforms of type {platform_type}'
@@ -294,8 +294,11 @@ def process_test_plan(test_plan_uuid):
                         instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
-                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid,
-                                                             service_instantiation_time=instantiation_end-instantiation_init)
+                    ex_response = executor.execution_request(
+                        test_descriptor_instance, test_plan_uuid,
+                        service_instantiation_time=instantiation_end-instantiation_init,
+                        docker_host=context['test_preparations'][test_plan_uuid].get('execution_host')
+                    )
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['platform']['name']) = service_platform['name']
@@ -484,8 +487,11 @@ def process_test_plan(test_plan_uuid):
                         instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
-                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid,
-                                                             service_instantiation_time=instantiation_end-instantiation_init)
+                    ex_response = executor.execution_request(
+                        test_descriptor_instance, test_plan_uuid,
+                        service_instantiation_time=instantiation_end-instantiation_init,
+                        docker_host=context['test_preparations'][test_plan_uuid].get('execution_host')
+                    )
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['platform']['name']) = service_platform['name']
