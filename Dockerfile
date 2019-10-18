@@ -32,13 +32,13 @@ LABEL organization=5GTANGO
 
 # Configuration
 
-ENV cat_base http://tng-cat:4011
-ENV platform_adapter_base http://tng-vnv-platform-adapter:5001
-ENV planner_base http://tng-vnv-planner:6100
-#ENV executor_base http://tng-vnv-executor:6300
-ENV executor_base http://tng-vnv-executor:8080
+ENV CAT_BASE http://tng-cat:4011
+ENV PLATFORM_ADAPTER_BASE http://tng-vnv-platform-adapter:5001
+ENV PLANNER_BASE http://tng-vnv-planner:6100
+ENV EXECUTOR_BASE http://tng-vnv-executor:8080
 # Load balancing algorithm
-ENV lb_algo random
+ENV LB_ALGO random
+ENV DOCKER_HOST unix://var/run/docker.sock
 
 # Install dependencies (system level)
 #RUN apt update && apt install -y glpk-utils python3-pip libffi-dev libssl-dev git
