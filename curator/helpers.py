@@ -202,6 +202,9 @@ def process_test_plan(test_plan_uuid):
                     else:
                         service_platform = random.choice(sp_list)
                         platform_adapter.sonata_sp_usage_count[service_platform['name']] = 1
+                else:
+                    service_platform = random.choice(sp_list)
+                    platform_adapter.sonata_sp_usage_count[service_platform['name']] = 1
                 _LOG.debug(f"Platform {service_platform} selected")
             else:
                 _LOG.warning(f"No load balancer selected")
@@ -399,6 +402,9 @@ def process_test_plan(test_plan_uuid):
                     else:
                         service_platform = random.choice(sp_list)
                         platform_adapter.osm_sp_usage_count[service_platform['name']] = 1
+                else:
+                    service_platform = random.choice(sp_list)
+                    platform_adapter.osm_sp_usage_count[service_platform['name']] = 1
                 _LOG.debug(f"Platform {service_platform} selected")
             else:
                 _LOG.warning(f"No load balancer selected")
