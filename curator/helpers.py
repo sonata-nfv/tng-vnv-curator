@@ -187,15 +187,17 @@ def process_test_plan(test_plan_uuid):
             elif load_balancer_algorithm == 'random':
                 service_platform = random.choice(sp_list)
             elif load_balancer_algorithm == 'round_robin':
-                least_used_son_sp = sorted(
-                    platform_adapter.sonata_sp_usage_count,
-                    key=platform_adapter.sonata_sp_usage_count.get)[0]
-                service_platform = [sp for sp in sp_list if sp['name'] == least_used_son_sp].pop()
-                if service_platform:
-                    platform_adapter.sonata_sp_usage_count[least_used_son_sp] += 1
-                else:
-                    service_platform = random.choice(sp_list)
-                    platform_adapter.sonata_sp_usage_count[service_platform['name']] = 1
+                if platform_adapter.sonata_sp_usage_count:
+                    least_used_son_sp = sorted(
+                        platform_adapter.sonata_sp_usage_count,
+                        key=platform_adapter.sonata_sp_usage_count.get)[0]
+                    platform_match_list = [sp for sp in sp_list if sp['name'] == least_used_son_sp]
+                    if platform_match_list:
+                        service_platform = platform_match_list[0]
+                        platform_adapter.sonata_sp_usage_count[least_used_son_sp] += 1
+                    else:
+                        service_platform = random.choice(sp_list)
+                        platform_adapter.sonata_sp_usage_count[service_platform['name']] = 1
             else:
                 service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
             # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
@@ -351,42 +353,43 @@ def process_test_plan(test_plan_uuid):
         elif 'OSM' in platforms and nsd_target == 'osm':
             _LOG.info(f"Accesing {nsd_target}")
             platform_type = 'OSM'
-            if load_balancer_algorithm == 'random':
-                sp_list = platform_adapter.available_platforms_by_type(platform_type.lower())
-                if not sp_list:
-                    err_msg = f'No available platforms of type {platform_type}'
+            sp_list = platform_adapter.available_platforms_by_type(platform_type.lower())
+            if not sp_list:
+                err_msg = f'No available platforms of type {platform_type}'
+                _LOG.error(err_msg)
+                try:
+                    callback_path = [
+                        d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+                        if d['status'] == 'COMPLETED'
+                    ][0]
+                    planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR',
+                                          exception=err_msg)
+                    return
+                except AttributeError as e:
+                    # _LOG.exception(e)
+                    err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
                     _LOG.error(err_msg)
-                    try:
-                        callback_path = [
-                            d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
-                            if d['status'] == 'COMPLETED'
-                        ][0]
-                        planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR',
-                                              exception=err_msg)
-                        return
-                    except AttributeError as e:
-                        # _LOG.exception(e)
-                        err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
-                        _LOG.error(err_msg)
-                        planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[],
-                                              status='ERROR', exception=err_msg)
-                        return
-                elif sp_name:
-                    service_platform = [sp for sp in sp_list if sp['name'] == sp_name].pop()
-                elif load_balancer_algorithm == 'random':
-                    service_platform = random.choice(sp_list)
-                elif load_balancer_algorithm == 'round_robin':
-                    least_used_osm_sp = sorted(
+                    planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[],
+                                          status='ERROR', exception=err_msg)
+                    return
+            elif sp_name:
+                service_platform = [sp for sp in sp_list if sp['name'] == sp_name].pop()
+            elif load_balancer_algorithm == 'random':
+                service_platform = random.choice(sp_list)
+            elif load_balancer_algorithm == 'round_robin':
+                if platform_adapter.osm_sp_usage_count:
+                    least_used_son_sp = sorted(
                         platform_adapter.osm_sp_usage_count,
                         key=platform_adapter.osm_sp_usage_count.get)[0]
-                    service_platform = [sp for sp in sp_list if sp['name'] == least_used_osm_sp].pop()
-                    if service_platform:
-                        platform_adapter.osm_sp_usage_count[least_used_osm_sp] += 1
+                    platform_match_list = [sp for sp in sp_list if sp['name'] == least_used_son_sp]
+                    if platform_match_list:
+                        service_platform = platform_match_list[0]
+                        platform_adapter.osm_sp_usage_count[least_used_son_sp] += 1
                     else:
                         service_platform = random.choice(sp_list)
                         platform_adapter.osm_sp_usage_count[service_platform['name']] = 1
-                else:
-                    service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
+            else:
+                service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
             # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
             # the nsd, I am keeping this previous block
             # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
