@@ -40,10 +40,16 @@ _LOG = TangoLogger.getLogger('curator:docker', log_level=logging.DEBUG, log_json
 
 
 class DockerInterface(Interface):
-    def __init__(self):
+    def __init__(self, execution_host=None):
         # connect to docker
         Interface.__init__(self)
-        self.docker_manager = self.connect()
+        if not execution_host:
+            # The default docker manager
+            self.docker_manager = self.connect()
+        else:
+            # Remote docker manager
+            docker_host = f'tcp://{execution_host}:2375'
+            self.docker_manager = docker.client.DockerClient(docker_host)
 
     def connect(self):
         """
@@ -157,3 +163,6 @@ class DockerInterface(Interface):
         self.docker_manager.stop(container=cn_name)
         self.docker_manager.remove_container(container=cn_name, force=True)
         self.docker_manager.remove_image(image=image, force=True)
+
+    def close(self):
+        self.docker_manager.close()

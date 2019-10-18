@@ -52,13 +52,18 @@ def process_test_plan(test_plan_uuid):
     context['test_preparations'][test_plan_uuid]['test_results'] = []
     context['events'][test_plan_uuid] = {}
     planner = context['plugins']['planner']
-    dockeri = context['plugins']['docker']
+    execution_host = context['test_preparations'][test_plan_uuid].get('execution_host')
+    if not execution_host:
+        dockeri = context['plugins']['docker']
+    else:
+        dockeri = dock_i.DockerInterface(execution_host=execution_host)
+        context['test_preparations'][test_plan_uuid]['docker_interface'] = dockeri
     # planner = vnv_i.PlannerInterface()
     # planner.add_new_test_plan(test_plan_uuid)
     platform_adapter = context['plugins']['platform_adapter']
     executor = context['plugins']['executor']
     vnv_cat = context['plugins']['catalogue']
-    load_balancer_algorithm = os.getenv('lb_algo','random')
+    load_balancer_algorithm = os.getenv('LB_ALGO','random')
     err_msg = None
     try:
         callback_path = [
@@ -623,7 +628,11 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
     _LOG.info(f'Test {test_id} from test-plan {test_plan_uuid} finished')
     _LOG.debug(f'Callback content: {content}')
     platform_adapter = context['plugins']['platform_adapter']
-    dockeri = context['plugins']['docker']
+    remote_docker_interface = context['test_preparations'][test_plan_uuid].get('docker_interface')
+    if not remote_docker_interface:
+        dockeri = context['plugins']['docker']
+    else:
+        dockeri = remote_docker_interface
     planner = context['plugins']['planner']
     try:
         callback_path = [
@@ -694,6 +703,8 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
             planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status=final_status)
             _LOG.debug(f'Response from planner: {planner_resp}')
             # if planner_resp ok, clean test_preparations entry
+            if remote_docker_interface:
+                dockeri.close()
             del context['test_preparations'][test_plan_uuid]
         except Exception as e:
             tb = "".join(traceback.format_exc().split("\n"))
@@ -724,7 +735,11 @@ def cancel_test_plan(test_plan_uuid):
     planner = context['plugins']['planner']
     executor = context['plugins']['executor']
     platform_adapter = context['plugins']['platform_adapter']
-    dockeri = context['plugins']['docker']
+    remote_docker_interface = context['test_preparations'][test_plan_uuid].get('docker_interface')
+    if not remote_docker_interface:
+        dockeri = context['plugins']['docker']
+    else:
+        dockeri = remote_docker_interface
     try:
         callback_path = [
             d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
@@ -780,6 +795,7 @@ def cancel_test_plan(test_plan_uuid):
     else:
         _LOG.warning(f'No probes for test plan {test_plan_uuid}')
 
+
     res_list = [
         {
             'test_uuid': d['test_uuid'],
@@ -792,6 +808,8 @@ def cancel_test_plan(test_plan_uuid):
     #  Callback to planner
     planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='CANCELLED')
     # if planner_resp ok, clean test_preparations entry
+    if remote_docker_interface:
+        dockeri.close()
     _LOG.debug(f'Response from planner: {planner_resp}')
     del context['test_preparations'][test_plan_uuid]
     _LOG.debug(f'Finished cancellation of {test_plan_uuid}')

@@ -56,7 +56,7 @@ class PlannerInterface(Interface):
     """
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
-        self.__base_url = os.getenv('planner_base')
+        self.__base_url = os.getenv('PLANNER_BASE')
         self.__running_test_plans = []
 
     def add_new_test_plan(self, test_plan_uuid):
@@ -95,7 +95,7 @@ class PlatformAdapterInterface(Interface):
     """
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
-        self.base_url = os.getenv('platform_adapter_base')
+        self.base_url = os.getenv('PLATFORM_ADAPTER_BASE')
         # self.running_instances = []
         self.events = []
         self.osm_sp_usage_count = dict()
@@ -441,7 +441,7 @@ class ExecutorInterface(Interface):
     """
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
-        self.base_url = os.getenv('executor_base')
+        self.base_url = os.getenv('EXECUTOR_BASE')
         self.version = 'v1'
         self.api = 'api'
         self.events = []
@@ -481,7 +481,7 @@ class ExecutorInterface(Interface):
             ]
         }
         if docker_host:
-            data['docker_host'] = docker_host
+            data['execution_host'] = docker_host
         url = '/'.join([self.base_url, self.api, self.version, 'test-executions'])
         headers = {"Content-type": "application/json"}
         _LOG.debug(f'Sending to executor {url} with payload {json.dumps(data)}')
