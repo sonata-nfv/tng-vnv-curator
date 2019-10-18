@@ -159,7 +159,7 @@ def process_test_plan(test_plan_uuid):
 
             platform_type = 'SONATA'
             sp_list = platform_adapter.available_platforms_by_type(platform_type.lower())
-            if sp_list:
+            if not sp_list:
                 err_msg = f'No available platforms of type {platform_type}'
                 _LOG.error(err_msg)
                 try:
@@ -345,7 +345,7 @@ def process_test_plan(test_plan_uuid):
             platform_type = 'OSM'
             if load_balancer_algorithm == 'random':
                 sp_list = platform_adapter.available_platforms_by_type(platform_type.lower())
-                if sp_list:
+                if not sp_list:
                     err_msg = f'No available platforms of type {platform_type}'
                     _LOG.error(err_msg)
                     try:
