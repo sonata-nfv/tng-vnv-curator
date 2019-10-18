@@ -446,12 +446,13 @@ class ExecutorInterface(Interface):
         self.api = 'api'
         self.events = []
 
-    def execution_request(self, tdi, test_plan_uuid, service_instantiation_time=None):
+    def execution_request(self, tdi, test_plan_uuid, service_instantiation_time=None, docker_host=None):
         """
 
         :param tdi:
         :param test_plan_uuid:
         :param service_instantiation_time:
+        :param docker_host:
         :return:
         """
         # TODO: Specify content in the callbacks?
@@ -479,6 +480,8 @@ class ExecutorInterface(Interface):
                 }
             ]
         }
+        if docker_host:
+            data['docker_host'] = docker_host
         url = '/'.join([self.base_url, self.api, self.version, 'test-executions'])
         headers = {"Content-type": "application/json"}
         _LOG.debug(f'Sending to executor {url} with payload {json.dumps(data)}')
