@@ -183,10 +183,14 @@ def process_test_plan(test_plan_uuid):
                                           status='ERROR', exception=err_msg)
                     return
             elif sp_name:
+                _LOG.debug(f"Overriding with service platform {sp_name}")
                 service_platform = [sp for sp in sp_list if sp['name'] == sp_name].pop()
             elif load_balancer_algorithm == 'random':
+                _LOG.debug(f"Using {load_balancer_algorithm} load balancer")
                 service_platform = random.choice(sp_list)
+                _LOG.debug(f"Platform {service_platform} selected")
             elif load_balancer_algorithm == 'round_robin':
+                _LOG.debug(f"Using {load_balancer_algorithm} load balancer")
                 if platform_adapter.sonata_sp_usage_count:
                     least_used_son_sp = sorted(
                         platform_adapter.sonata_sp_usage_count,
@@ -198,8 +202,11 @@ def process_test_plan(test_plan_uuid):
                     else:
                         service_platform = random.choice(sp_list)
                         platform_adapter.sonata_sp_usage_count[service_platform['name']] = 1
+                _LOG.debug(f"Platform {service_platform} selected")
             else:
+                _LOG.warning(f"No load balancer selected")
                 service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
+                _LOG.debug(f"Platform {service_platform} selected")
             # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
             # the nsd, I am keeping this previous block
             # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
@@ -373,10 +380,14 @@ def process_test_plan(test_plan_uuid):
                                           status='ERROR', exception=err_msg)
                     return
             elif sp_name:
+                _LOG.debug(f"Overriding with service platform {sp_name}")
                 service_platform = [sp for sp in sp_list if sp['name'] == sp_name].pop()
             elif load_balancer_algorithm == 'random':
+                _LOG.debug(f"Using {load_balancer_algorithm} load balancer")
                 service_platform = random.choice(sp_list)
+                _LOG.debug(f"Platform {service_platform} selected")
             elif load_balancer_algorithm == 'round_robin':
+                _LOG.debug(f"Using {load_balancer_algorithm} load balancer")
                 if platform_adapter.osm_sp_usage_count:
                     least_used_son_sp = sorted(
                         platform_adapter.osm_sp_usage_count,
@@ -388,8 +399,11 @@ def process_test_plan(test_plan_uuid):
                     else:
                         service_platform = random.choice(sp_list)
                         platform_adapter.osm_sp_usage_count[service_platform['name']] = 1
+                _LOG.debug(f"Platform {service_platform} selected")
             else:
+                _LOG.warning(f"No load balancer selected")
                 service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
+                _LOG.debug(f"Platform {service_platform} selected")
             # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
             # the nsd, I am keeping this previous block
             # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
