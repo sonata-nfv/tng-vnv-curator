@@ -162,7 +162,7 @@ def process_test_plan(test_plan_uuid):
         if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
             _LOG.info(f"Accesing {nsd_target}")
             platform_type = 'SONATA'
-
+            policy_id = context['test_preparations'][test_plan_uuid].get('policy_id')
             sp_list = platform_adapter.available_platforms_by_type(platform_type.lower())
             if not sp_list:
                 err_msg = f'No available platforms of type {platform_type}'
@@ -226,7 +226,8 @@ def process_test_plan(test_plan_uuid):
                 service_platform['name'],
                 nsd['name'], nsd['vendor'], nsd['version'],
                 instance_name=instance_name,
-                test_plan_uuid=test_plan_uuid
+                test_plan_uuid=test_plan_uuid,
+                policy_id=policy_id
             )
             if 'error' in inst_result and inst_result['error']:
                 # Error before instantiation

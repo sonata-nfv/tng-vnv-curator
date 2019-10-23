@@ -273,7 +273,7 @@ class PlatformAdapterInterface(Interface):
 
     def automated_instantiation_sonata(self, service_platform,
                                        service_name, service_vendor, service_version,
-                                       instance_name, test_plan_uuid):
+                                       instance_name, test_plan_uuid, policy_id=None):
         """
         Simpler version to instantiate a service, working for sonata
         :param service_platform:
@@ -296,6 +296,8 @@ class PlatformAdapterInterface(Interface):
                 'test-preparations', test_plan_uuid,
                 'service-instances', instance_name, 'sp-ready'])
         }
+        if policy_id:
+            data['policy_id'] = policy_id
         _LOG.debug(f'Instantiation payload: {data}')
         url = '/'.join([self.base_url, 'adapters', 'instantiate_service'])
         _LOG.debug(f'Accesing {url}')
