@@ -246,6 +246,13 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
                f'Content-type: {request.headers["Content-type"]}')
     try:
         payload = request.get_json()
+        if not context['test_preparations'].get(test_plan_uuid):
+            make_response(
+                f'{{"error": "Test plan #{test_plan_uuid} has been cancelled or was not found"}}',
+                NOT_FOUND,
+                {'Content-Type': 'application/json'}
+            )
+
         context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
         # payload = json.loads(request.get_data().decode("UTF-8"))
         _LOG.debug(f'Callback received, contains {payload}')
@@ -295,6 +302,7 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
                 {'Content-Type': 'application/json'}
             )
     except Exception as e:
+        _LOG.error(f'Got an Exception: {e}')
         return make_response(json.dumps({'exception': e.args}), INTERNAL_ERROR, {'Content-Type': 'application/json'})
 
 

@@ -278,11 +278,15 @@ def process_test_plan(test_plan_uuid):
                         (p_index, augd) for p_index, augd in
                         enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
                         if augd['error'] and augd['nsi_name'] == instance_name
-                    ]
+                    ].pop()
                     if error_params:
-                        _LOG.error(f'Received error from PA: {error_params}')
+                        _LOG.error(f'Received error from PA: {error_params[1]}')
                         (context['test_preparations'][test_plan_uuid]
                             ['augmented_descriptors'][error_params[0]]['test_status']) = 'ERROR'
+                        (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                            [error_params[0]]['error']) = f'PA: {error_params[1]}'
+                        _LOG.error(f'Error processed for {test_plan_uuid}')
+                        err_msg = context['test_preparations'][test_plan_uuid]['augmented_descriptors'][error_params[0]]['error']
                         # Prepare callback to planner
 
                 (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
@@ -483,12 +487,17 @@ def process_test_plan(test_plan_uuid):
                         (p_index, augd) for p_index, augd in
                         enumerate(context['test_preparations'][test_plan_uuid]['augmented_descriptors'])
                         if augd['error'] and augd['nsi_name'] == instance_name
-                    ]
+                    ].pop()
                     if error_params:
-                        _LOG.error(f'Received error from PA: {error_params}')
+                        _LOG.error(f'Received error from PA: {error_params[1]}')
                         (context['test_preparations'][test_plan_uuid]
                             ['augmented_descriptors'][error_params[0]]['test_status']) = 'ERROR'
+                        (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
+                            [error_params[0]]['error']) = f'PA: {error_params[1]}'
+                        err_msg = \
+                        context['test_preparations'][test_plan_uuid]['augmented_descriptors'][error_params[0]]['error']
                         # Prepare callback to planner
+
                 (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
                     [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
                         if 'package_uploaded' in inst_result else False
