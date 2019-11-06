@@ -233,8 +233,8 @@ def test_plan_cancelled(test_plan_uuid):
                      '<instance_name>', 'sp-ready']),
            methods=['POST'])
 def prepare_environment_callback(test_plan_uuid, instance_name):
-    """
-    This callback is used by OSM to notify
+    """This callback is used by PA to notify the result of an instantiation and continue with
+    the testing schedule
     :param test_plan_uuid:
     :param instance_name:
     :return:
@@ -242,8 +242,8 @@ def prepare_environment_callback(test_plan_uuid, instance_name):
     # Notify SP setup blocked thread
     # app.logger.debug(f'Callback received {request.path}, contains {request.get_data()}, '
     #                  f'Content-type: {request.headers["Content-type"]}')
-    _LOG.debug(f'Callback received {request.path}, contains {request.get_data()}, '
-                     f'Content-type: {request.headers["Content-type"]}')
+    _LOG.debug(f'Callback received {request.path}, contains {request.get_data()},'
+               f'Content-type: {request.headers["Content-type"]}')
     try:
         payload = request.get_json()
         context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)

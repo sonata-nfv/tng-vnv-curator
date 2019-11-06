@@ -43,7 +43,7 @@ class CatalogueInterface(Interface):
     """
     def __init__(self):
         Interface.__init__(self)
-        self.base_url = os.getenv('cat_base')
+        self.base_url = os.getenv('CAT_BASE')
         self.VERSION = 'v2'
 
     def get_network_descriptor(self, network_uuid):

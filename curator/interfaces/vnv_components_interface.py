@@ -56,7 +56,7 @@ class PlannerInterface(Interface):
     """
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
-        self.__base_url = os.getenv('planner_base')
+        self.__base_url = os.getenv('PLANNER_BASE')
         self.__running_test_plans = []
 
     def add_new_test_plan(self, test_plan_uuid):
@@ -95,9 +95,11 @@ class PlatformAdapterInterface(Interface):
     """
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
-        self.base_url = os.getenv('platform_adapter_base')
-        self.running_instances = []
+        self.base_url = os.getenv('PLATFORM_ADAPTER_BASE')
+        # self.running_instances = []
         self.events = []
+        self.osm_sp_usage_count = dict()
+        self.sonata_sp_usage_count = dict()
 
     def available_platforms(self):
         url = '/'.join([self.base_url, 'service_platforms'])
@@ -271,7 +273,7 @@ class PlatformAdapterInterface(Interface):
 
     def automated_instantiation_sonata(self, service_platform,
                                        service_name, service_vendor, service_version,
-                                       instance_name, test_plan_uuid):
+                                       instance_name, test_plan_uuid, policy_id=None):
         """
         Simpler version to instantiate a service, working for sonata
         :param service_platform:
@@ -294,6 +296,8 @@ class PlatformAdapterInterface(Interface):
                 'test-preparations', test_plan_uuid,
                 'service-instances', instance_name, 'sp-ready'])
         }
+        if policy_id:
+            data['policy_id'] = policy_id
         _LOG.debug(f'Instantiation payload: {data}')
         url = '/'.join([self.base_url, 'adapters', 'instantiate_service'])
         _LOG.debug(f'Accesing {url}')
@@ -439,17 +443,18 @@ class ExecutorInterface(Interface):
     """
     def __init__(self, cu_api_root, cu_api_version):
         Interface.__init__(self, cu_api_root, cu_api_version)
-        self.base_url = os.getenv('executor_base')
+        self.base_url = os.getenv('EXECUTOR_BASE')
         self.version = 'v1'
         self.api = 'api'
         self.events = []
 
-    def execution_request(self, tdi, test_plan_uuid, service_instantiation_time=None):
+    def execution_request(self, tdi, test_plan_uuid, service_instantiation_time=None, docker_host=None):
         """
 
         :param tdi:
         :param test_plan_uuid:
         :param service_instantiation_time:
+        :param docker_host:
         :return:
         """
         # TODO: Specify content in the callbacks?
@@ -477,6 +482,8 @@ class ExecutorInterface(Interface):
                 }
             ]
         }
+        if docker_host:
+            data['execution_host'] = docker_host
         url = '/'.join([self.base_url, self.api, self.version, 'test-executions'])
         headers = {"Content-type": "application/json"}
         _LOG.debug(f'Sending to executor {url} with payload {json.dumps(data)}')

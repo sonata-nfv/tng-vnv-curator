@@ -31,6 +31,7 @@ import json
 import logging
 import threading
 import random
+import os
 from curator.database import context
 import curator.interfaces.vnv_components_interface as vnv_i
 import curator.interfaces.common_databases_interface as db_i
@@ -51,12 +52,18 @@ def process_test_plan(test_plan_uuid):
     context['test_preparations'][test_plan_uuid]['test_results'] = []
     context['events'][test_plan_uuid] = {}
     planner = context['plugins']['planner']
-    dockeri = context['plugins']['docker']
+    execution_host = context['test_preparations'][test_plan_uuid].get('execution_host')
+    if not execution_host:
+        dockeri = context['plugins']['docker']
+    else:
+        dockeri = dock_i.DockerInterface(execution_host=execution_host)
+        context['test_preparations'][test_plan_uuid]['docker_interface'] = dockeri
     # planner = vnv_i.PlannerInterface()
     # planner.add_new_test_plan(test_plan_uuid)
     platform_adapter = context['plugins']['platform_adapter']
     executor = context['plugins']['executor']
     vnv_cat = context['plugins']['catalogue']
+    load_balancer_algorithm = os.getenv('LB_ALGO','random')
     err_msg = None
     try:
         callback_path = [
@@ -80,6 +87,9 @@ def process_test_plan(test_plan_uuid):
         except Exception as e:
             planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=e)
             return
+
+    # OPTIONAL: get sp_name if it is in the payload, None elsecase
+    sp_name = context['test_preparations'][test_plan_uuid].get('sp_name')
 
     # NOTE: support for several nsds (same kind) -> NO
     # for nsd in context['test_preparations'][test_plan_uuid]['nsd_batch']
@@ -152,7 +162,54 @@ def process_test_plan(test_plan_uuid):
         if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
             _LOG.info(f"Accesing {nsd_target}")
             platform_type = 'SONATA'
-            service_platform = random.choice(platform_adapter.available_platforms_by_type(platform_type.lower()))
+            policy_id = context['test_preparations'][test_plan_uuid].get('policy_id')
+            sp_list = platform_adapter.available_platforms_by_type(platform_type.lower())
+            if not sp_list:
+                err_msg = f'No available platforms of type {platform_type}'
+                _LOG.error(err_msg)
+                try:
+                    callback_path = [
+                        d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+                        if d['status'] == 'COMPLETED'
+                    ][0]
+                    planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR',
+                                          exception=err_msg)
+                    return
+                except AttributeError as e:
+                    # _LOG.exception(e)
+                    err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+                    _LOG.error(err_msg)
+                    planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[],
+                                          status='ERROR', exception=err_msg)
+                    return
+            elif sp_name:
+                _LOG.debug(f"Overriding with service platform {sp_name}")
+                service_platform = [sp for sp in sp_list if sp['name'] == sp_name].pop()
+            elif load_balancer_algorithm == 'random':
+                _LOG.debug(f"Using {load_balancer_algorithm} load balancer")
+                service_platform = random.choice(sp_list)
+                _LOG.debug(f"Platform {service_platform} selected")
+            elif load_balancer_algorithm == 'round_robin':
+                _LOG.debug(f"Using {load_balancer_algorithm} load balancer")
+                if platform_adapter.sonata_sp_usage_count:
+                    least_used_son_sp = sorted(
+                        platform_adapter.sonata_sp_usage_count,
+                        key=platform_adapter.sonata_sp_usage_count.get)[0]
+                    platform_match_list = [sp for sp in sp_list if sp['name'] == least_used_son_sp]
+                    if platform_match_list:
+                        service_platform = platform_match_list[0]
+                        platform_adapter.sonata_sp_usage_count[least_used_son_sp] += 1
+                    else:
+                        service_platform = random.choice(sp_list)
+                        platform_adapter.sonata_sp_usage_count[service_platform['name']] = 1
+                else:
+                    service_platform = random.choice(sp_list)
+                    platform_adapter.sonata_sp_usage_count[service_platform['name']] = 1
+                _LOG.debug(f"Platform {service_platform} selected")
+            else:
+                _LOG.warning(f"No load balancer selected")
+                service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
+                _LOG.debug(f"Platform {service_platform} selected")
             # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
             # the nsd, I am keeping this previous block
             # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
@@ -169,7 +226,8 @@ def process_test_plan(test_plan_uuid):
                 service_platform['name'],
                 nsd['name'], nsd['vendor'], nsd['version'],
                 instance_name=instance_name,
-                test_plan_uuid=test_plan_uuid
+                test_plan_uuid=test_plan_uuid,
+                policy_id=policy_id
             )
             if 'error' in inst_result and inst_result['error']:
                 # Error before instantiation
@@ -254,8 +312,11 @@ def process_test_plan(test_plan_uuid):
                         instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
-                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid,
-                                                             service_instantiation_time=instantiation_end-instantiation_init)
+                    ex_response = executor.execution_request(
+                        test_descriptor_instance, test_plan_uuid,
+                        service_instantiation_time=instantiation_end-instantiation_init,
+                        docker_host=context['test_preparations'][test_plan_uuid].get('execution_host')
+                    )
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['platform']['name']) = service_platform['name']
@@ -303,7 +364,53 @@ def process_test_plan(test_plan_uuid):
         elif 'OSM' in platforms and nsd_target == 'osm':
             _LOG.info(f"Accesing {nsd_target}")
             platform_type = 'OSM'
-            service_platform = random.choice(platform_adapter.available_platforms_by_type(platform_type.lower()))
+            sp_list = platform_adapter.available_platforms_by_type(platform_type.lower())
+            if not sp_list:
+                err_msg = f'No available platforms of type {platform_type}'
+                _LOG.error(err_msg)
+                try:
+                    callback_path = [
+                        d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+                        if d['status'] == 'COMPLETED'
+                    ][0]
+                    planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR',
+                                          exception=err_msg)
+                    return
+                except AttributeError as e:
+                    # _LOG.exception(e)
+                    err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+                    _LOG.error(err_msg)
+                    planner.send_callback('/test-plans/on-change/completed', test_plan_uuid, result_list=[],
+                                          status='ERROR', exception=err_msg)
+                    return
+            elif sp_name:
+                _LOG.debug(f"Overriding with service platform {sp_name}")
+                service_platform = [sp for sp in sp_list if sp['name'] == sp_name].pop()
+            elif load_balancer_algorithm == 'random':
+                _LOG.debug(f"Using {load_balancer_algorithm} load balancer")
+                service_platform = random.choice(sp_list)
+                _LOG.debug(f"Platform {service_platform} selected")
+            elif load_balancer_algorithm == 'round_robin':
+                _LOG.debug(f"Using {load_balancer_algorithm} load balancer")
+                if platform_adapter.osm_sp_usage_count:
+                    least_used_son_sp = sorted(
+                        platform_adapter.osm_sp_usage_count,
+                        key=platform_adapter.osm_sp_usage_count.get)[0]
+                    platform_match_list = [sp for sp in sp_list if sp['name'] == least_used_son_sp]
+                    if platform_match_list:
+                        service_platform = platform_match_list[0]
+                        platform_adapter.osm_sp_usage_count[least_used_son_sp] += 1
+                    else:
+                        service_platform = random.choice(sp_list)
+                        platform_adapter.osm_sp_usage_count[service_platform['name']] = 1
+                else:
+                    service_platform = random.choice(sp_list)
+                    platform_adapter.osm_sp_usage_count[service_platform['name']] = 1
+                _LOG.debug(f"Platform {service_platform} selected")
+            else:
+                _LOG.warning(f"No load balancer selected")
+                service_platform = platform_adapter.available_platforms_by_type(platform_type.lower())[0]
+                _LOG.debug(f"Platform {service_platform} selected")
             # (jdelacruz) Until (vendor, name, version) is assured to be the same for the package than for
             # the nsd, I am keeping this previous block
             # _LOG.debug('Search package for nsd {vendor}:{name}:{version}'.format(**nsd))
@@ -409,8 +516,11 @@ def process_test_plan(test_plan_uuid):
                         instance_uuid=instantiation_params[0][1]['nsi_uuid']
                     )
                     _LOG.debug(f'Generated tdi: {json.dumps(test_descriptor_instance)}, sending to executor')
-                    ex_response = executor.execution_request(test_descriptor_instance, test_plan_uuid,
-                                                             service_instantiation_time=instantiation_end-instantiation_init)
+                    ex_response = executor.execution_request(
+                        test_descriptor_instance, test_plan_uuid,
+                        service_instantiation_time=instantiation_end-instantiation_init,
+                        docker_host=context['test_preparations'][test_plan_uuid].get('execution_host')
+                    )
                     (context['test_preparations'][test_plan_uuid]
                         ['augmented_descriptors'][instantiation_params[0][0]]
                         ['platform']['name']) = service_platform['name']
@@ -542,7 +652,11 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
     _LOG.info(f'Test {test_id} from test-plan {test_plan_uuid} finished')
     _LOG.debug(f'Callback content: {content}')
     platform_adapter = context['plugins']['platform_adapter']
-    dockeri = context['plugins']['docker']
+    remote_docker_interface = context['test_preparations'][test_plan_uuid].get('docker_interface')
+    if not remote_docker_interface:
+        dockeri = context['plugins']['docker']
+    else:
+        dockeri = remote_docker_interface
     planner = context['plugins']['planner']
     try:
         callback_path = [
@@ -613,6 +727,8 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
             planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status=final_status)
             _LOG.debug(f'Response from planner: {planner_resp}')
             # if planner_resp ok, clean test_preparations entry
+            if remote_docker_interface:
+                dockeri.close()
             del context['test_preparations'][test_plan_uuid]
         except Exception as e:
             tb = "".join(traceback.format_exc().split("\n"))
@@ -643,7 +759,11 @@ def cancel_test_plan(test_plan_uuid):
     planner = context['plugins']['planner']
     executor = context['plugins']['executor']
     platform_adapter = context['plugins']['platform_adapter']
-    dockeri = context['plugins']['docker']
+    remote_docker_interface = context['test_preparations'][test_plan_uuid].get('docker_interface')
+    if not remote_docker_interface:
+        dockeri = context['plugins']['docker']
+    else:
+        dockeri = remote_docker_interface
     try:
         callback_path = [
             d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
@@ -699,6 +819,7 @@ def cancel_test_plan(test_plan_uuid):
     else:
         _LOG.warning(f'No probes for test plan {test_plan_uuid}')
 
+
     res_list = [
         {
             'test_uuid': d['test_uuid'],
@@ -711,6 +832,8 @@ def cancel_test_plan(test_plan_uuid):
     #  Callback to planner
     planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status='CANCELLED')
     # if planner_resp ok, clean test_preparations entry
+    if remote_docker_interface:
+        dockeri.close()
     _LOG.debug(f'Response from planner: {planner_resp}')
     del context['test_preparations'][test_plan_uuid]
     _LOG.debug(f'Finished cancellation of {test_plan_uuid}')
