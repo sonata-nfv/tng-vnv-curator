@@ -126,7 +126,11 @@ def process_test_plan(test_plan_uuid):
         except Exception as e:
             planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=e)
             return
-    platforms = td['service_platforms']  # should be a list
+    platforms = td.get('service_platforms')  # should be a list not null
+    if not platforms:
+        err_msg = f'"service_platforms" field in test descriptor is required, found {platforms}'
+        _LOG.error(err_msg)
+        planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
     context['test_preparations'][test_plan_uuid]['probes'] = []
     _LOG.debug(f'testd: {td}, nsd: {nsd}, nsd_target: {nsd_target}')
     # TODO: get nsd and testd if only uuid is included (normal function) and avoid it if there's testd and/or nsd included in the payload
@@ -290,7 +294,7 @@ def process_test_plan(test_plan_uuid):
                         # Prepare callback to planner
 
                 (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-                [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
+                    [instantiation_params[0][0]]['package_uploaded']) = inst_result['package_uploaded'] \
                     if 'package_uploaded' in inst_result else False
                 if 'testd_uuid' not in context['test_preparations'][test_plan_uuid]:
                     test_cat = vnv_cat.get_test_descriptor_tuple(td['vendor'], td['name'], td['version'])
@@ -598,7 +602,7 @@ def process_test_plan(test_plan_uuid):
             return
 
     if not context['test_preparations'][test_plan_uuid]['augmented_descriptors'] and not err_msg:
-        # No correct test executions, sendind callback
+        # No correct test executions, sending callback
         err_msg = f'Curator was not able to setup any of the test environments for {test_plan_uuid}, ' \
                   f'sending callback to planner'
         _LOG.warning(err_msg)
@@ -634,6 +638,7 @@ def process_test_plan(test_plan_uuid):
                                   status='ERROR',
                                   exception=err_msg)
             return
+
     elif all([
         test['test_status'] == 'COMPLETED'
         or test['test_status'] == 'ERROR'
@@ -645,7 +650,8 @@ def process_test_plan(test_plan_uuid):
                 d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
                 if d['status'] == 'COMPLETED'
             ][0]
-            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR')
+            results = [test.get('test_results') for test in context['test_preparations'][test_plan_uuid]]
+            planner.send_callback(callback_path, test_plan_uuid, result_list=results, status='ERROR')
             return
         except AttributeError as e:
             # _LOG.exception(e)
