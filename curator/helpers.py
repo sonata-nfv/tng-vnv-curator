@@ -133,7 +133,8 @@ def process_test_plan(test_plan_uuid):
         planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
     context['test_preparations'][test_plan_uuid]['probes'] = []
     _LOG.debug(f'testd: {td}, nsd: {nsd}, nsd_target: {nsd_target}')
-    # TODO: get nsd and testd if only uuid is included (normal function) and avoid it if there's testd and/or nsd included in the payload
+    # TODO: get nsd and testd if only uuid is included (normal function) and avoid
+    # it if there's testd and/or nsd included in the payload
     setup_phase = [phase for phase in td['phases'] if phase['id'] == 'setup'].pop()
     configuration_action = [step for step in setup_phase['steps'] if step['action'] == 'configure'].pop()
     _LOG.debug(f'configuration_phase: {configuration_action}')
@@ -151,18 +152,18 @@ def process_test_plan(test_plan_uuid):
             )
             _LOG.debug(f'Got {probe["name"]}, {image}')
         except Exception as e:
-            _LOG.exception(e)
-            image_id = f'aa-bb-cc-dd-{probe["name"]}'
-            context['test_preparations'][test_plan_uuid]['probes'].append(
-                {
-                    'id': image_id,
-                    'name': probe['name'],
-                    'image': probe['image']
-                }
-            )
-            _LOG.error(f'Exception getting probe {probe["name"]}')
+            # image_id = f'aa-bb-cc-dd-{probe["name"]}'
+            # context['test_preparations'][test_plan_uuid]['probes'].append(
+            #     {
+            #         'id': image_id,
+            #         'name': probe['name'],
+            #         'image': probe['image']
+            #     }
+            # )
+            err_msg = f'Exception getting probe {probe["name"]}: {e}'
+            _LOG.error(err_msg)
 
-    if type(platforms) is list:
+    if not err_msg and type(platforms) is list:
         if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
             _LOG.info(f"Accesing {nsd_target}")
             platform_type = 'SONATA'
@@ -289,8 +290,8 @@ def process_test_plan(test_plan_uuid):
                             ['augmented_descriptors'][error_params[0]]['test_status']) = 'ERROR'
                         (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
                             [error_params[0]]['error']) = f'PA: {error_params[1]}'
-                        _LOG.error(f'Error processed for {test_plan_uuid}')
                         err_msg = context['test_preparations'][test_plan_uuid]['augmented_descriptors'][error_params[0]]['error']
+                        _LOG.error(f'Error processed for {test_plan_uuid}: {err_msg}')
                         # Prepare callback to planner
 
                 (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
@@ -584,7 +585,7 @@ def process_test_plan(test_plan_uuid):
         else:
             _LOG.warning(f"Platform {nsd_target} is not compatible")
 
-    else:
+    elif not err_msg:
         err_msg = f'Wrong platform value, should be a list and is a {type(platforms)}'
         _LOG.error(err_msg)
         try:
@@ -638,6 +639,15 @@ def process_test_plan(test_plan_uuid):
                                   status='ERROR',
                                   exception=err_msg)
             return
+
+    elif context['test_preparations'][test_plan_uuid] and err_msg:
+        _LOG.error('Triggering unknown failure process')
+        callback_path = [
+            d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+            if d['status'] == 'COMPLETED'
+        ][0]
+        planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+        return
 
     elif all([
         test['test_status'] == 'COMPLETED'
