@@ -51,6 +51,9 @@ class DockerInterface(Interface):
             docker_host = f'tcp://{execution_host}:2375'
             self.docker_manager = docker.client.DockerClient(docker_host)
 
+        if self.docker_manager.ping():
+            return
+
     def connect(self):
         """
         Connect to a Docker service on which FSMs/SSMs shall be executed.
