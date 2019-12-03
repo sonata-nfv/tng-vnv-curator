@@ -154,7 +154,14 @@ def process_test_plan(test_plan_uuid):
     for probe in configuration_action['probes']:
         _LOG.debug(f'Getting {probe["name"]}')
         try:
-            image = dockeri.pull(probe['image'])
+            if len(probe['image'].split(':')) == 1:
+                _LOG.warning(f'{probe["image"]} tag is not specified, using latest instead')
+                image = dockeri.pull(':'.join([probe['image'], 'latest']))
+            elif len(probe['image'].split(':')) == 2:
+                image = dockeri.pull(probe['image'])
+            else:
+                raise Exception('Probe image name was wrongly formatted?')
+
             if image:
                 context['test_preparations'][test_plan_uuid]['probes'].append(
                     {
