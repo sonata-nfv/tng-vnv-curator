@@ -381,14 +381,14 @@ def test_cancelled(test_plan_uuid, test_uuid):
             context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
             if test_uuid in context['events'][test_plan_uuid]:
                 # app.logger.warning(f'Resuming test {test_uuid} cancelation process')
-                _LOG.warning(f'Resuming test {test_uuid} cancelation process')
+                _LOG.warning(f'Resuming test {test_uuid} cancellation process')
                 context['events'][test_plan_uuid][test_uuid].set()
             else:
                 # app.logger.warning(f'Test {test_uuid} appears to be canceled or non-existent')
-                _LOG.warning(f'Test {test_uuid} appears to be canceled or non-existent')
+                _LOG.warning(f'Test {test_uuid} appears to be cancelled or non-existent')
         else:
             # app.logger.debug(f'Executor reported some error while cancelling test #{test_uuid}')
-            _LOG.debug(f'Executor reported some error while cancelling test #{test_uuid}')
+            _LOG.debug(f'Executor reported some error while executing or cancelling test #{test_uuid}')
             context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
             if test_uuid not in [result_entry['test_uuid'] for result_entry in context['test_preparations'][test_plan_uuid]['test_results']]:
                 context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
@@ -402,7 +402,8 @@ def test_cancelled(test_plan_uuid, test_uuid):
                 context['events'][test_plan_uuid][test_uuid].set()
             else:
                 # app.logger.warning(f'Test {test_uuid} appears to be canceled or non-existent, or test failed')
-                _LOG.warning(f'Test {test_uuid} appears to be canceled or non-existent, or test failed')
+                _LOG.warning(f'Test {test_uuid} execution failed, or appears to be cancelled or non-existent. '
+                             f'Cleaning environment.')
             process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, request.get_json(),))
             process_thread.start()
             context['threads'].append(process_thread)
@@ -427,7 +428,8 @@ def test_cancelled(test_plan_uuid, test_uuid):
 
 @app.route('/'.join(['', API_ROOT, API_VERSION, 'context']), methods=['GET'])
 def get_context():
-    f_context = {k: context[k] for k in context.keys() if k != 'plugins' and k != 'threads' and k != 'events'}
+    # f_context = {k: context[k] for k in context.keys() if k != 'plugins' and k != 'threads' and k != 'events'}
+    f_context = {k: str(context[k]) for k in context.keys()}
     return make_response(
         json.dumps(f_context),
         OK,
@@ -478,7 +480,7 @@ def dummy_endpoint():
 
             return make_response(request.get_data(), OK, {'Content-type': request.headers['Content-type']})
         else:
-            raise Exception('NOOOOOOOOOOOOOOOOOOOOOOOO')
+            raise Exception('ERROR')
     except Exception as e:
         return make_response(json.dumps({'error': ''.join(traceback.format_exc().split("\n"))}), INTERNAL_ERROR, {'Content-type': 'application/json'})
 

@@ -53,11 +53,19 @@ def process_test_plan(test_plan_uuid):
     context['events'][test_plan_uuid] = {}
     planner = context['plugins']['planner']
     execution_host = context['test_preparations'][test_plan_uuid].get('execution_host')
-    if not execution_host:
-        dockeri = context['plugins']['docker']
-    else:
-        dockeri = dock_i.DockerInterface(execution_host=execution_host)
-        context['test_preparations'][test_plan_uuid]['docker_interface'] = dockeri
+    try:
+        if not execution_host:
+            dockeri = context['plugins']['docker']
+        else:
+            dockeri = dock_i.DockerInterface(execution_host=execution_host)
+            context['test_preparations'][test_plan_uuid]['docker_interface'] = dockeri
+    except Exception as e:
+        err_msg = f'Exception when connecting to execution host: {e}'
+        _LOG.error(err_msg)
+        callback_path = '/api/v1/test-plans/on-change/completed'
+        planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+        return
+
     # planner = vnv_i.PlannerInterface()
     # planner.add_new_test_plan(test_plan_uuid)
     platform_adapter = context['plugins']['platform_adapter']
@@ -72,7 +80,7 @@ def process_test_plan(test_plan_uuid):
         ][0]
     except AttributeError as e:
         # _LOG.exception(e)
-        err_msg = f'Callbacks: {e} but going fallback to /test-plans/on-change/completed'
+        err_msg = f'Error reading callbacks: {e} but using /test-plans/on-change/completed'
         _LOG.error(err_msg)
         callback_path = '/api/v1/test-plans/on-change/completed'
 
@@ -85,7 +93,9 @@ def process_test_plan(test_plan_uuid):
             raw_td = vnv_cat.get_test_descriptor(context['test_preparations'][test_plan_uuid]['testd_uuid'])
             td = raw_td['testd']
         except Exception as e:
-            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=e)
+            err_msg = f'Error when accesing TD: {e}'
+            _LOG.error(err_msg)
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
             return
 
     # OPTIONAL: get sp_name if it is in the payload, None elsecase
@@ -124,16 +134,20 @@ def process_test_plan(test_plan_uuid):
                 else:
                     raise ValueError('VnV is not compatible with this network service descriptor')
         except Exception as e:
-            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=e)
+            err_msg = f'Error when accesing NSD: {e}'
+            _LOG.error(err_msg)
+            planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
             return
     platforms = td.get('service_platforms')  # should be a list not null
     if not platforms:
         err_msg = f'"service_platforms" field in test descriptor is required, found {platforms}'
         _LOG.error(err_msg)
         planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+        return
     context['test_preparations'][test_plan_uuid]['probes'] = []
     _LOG.debug(f'testd: {td}, nsd: {nsd}, nsd_target: {nsd_target}')
-    # TODO: get nsd and testd if only uuid is included (normal function) and avoid it if there's testd and/or nsd included in the payload
+    # TODO: get nsd and testd if only uuid is included (normal function) and avoid
+    # it if there's testd and/or nsd included in the payload
     setup_phase = [phase for phase in td['phases'] if phase['id'] == 'setup'].pop()
     configuration_action = [step for step in setup_phase['steps'] if step['action'] == 'configure'].pop()
     _LOG.debug(f'configuration_phase: {configuration_action}')
@@ -141,28 +155,31 @@ def process_test_plan(test_plan_uuid):
         _LOG.debug(f'Getting {probe["name"]}')
         try:
             image = dockeri.pull(probe['image'])
-            image_id = image.short_id
-            context['test_preparations'][test_plan_uuid]['probes'].append(
-                {
-                    'id': str(image_id).split(':')[1],
-                    'name': probe['name'],
-                    'image': probe['image']
-                }
-            )
-            _LOG.debug(f'Got {probe["name"]}, {image}')
+            if image:
+                context['test_preparations'][test_plan_uuid]['probes'].append(
+                    {
+                        'id': str(image.short_id).split(':')[1],
+                        'name': probe['name'],
+                        'image': probe['image']
+                    }
+                )
+                _LOG.debug(f'Got {probe["name"]}, {image}')
+            else:
+                err_msg = f'Exception getting probe {probe["name"]}: Image not found'
+                _LOG.error(err_msg)
         except Exception as e:
-            _LOG.exception(e)
-            image_id = f'aa-bb-cc-dd-{probe["name"]}'
-            context['test_preparations'][test_plan_uuid]['probes'].append(
-                {
-                    'id': image_id,
-                    'name': probe['name'],
-                    'image': probe['image']
-                }
-            )
-            _LOG.error(f'Exception getting probe {probe["name"]}')
+            # image_id = f'aa-bb-cc-dd-{probe["name"]}'
+            # context['test_preparations'][test_plan_uuid]['probes'].append(
+            #     {
+            #         'id': image_id,
+            #         'name': probe['name'],
+            #         'image': probe['image']
+            #     }
+            # )
+            err_msg = f'Exception getting probe {probe["name"]}: {e}'
+            _LOG.error(err_msg)
 
-    if type(platforms) is list:
+    if not err_msg and type(platforms) is list:
         if 'SONATA' in platforms and (nsd_target == '5gtango' or nsd_target == 'sonata'):
             _LOG.info(f"Accesing {nsd_target}")
             platform_type = 'SONATA'
@@ -289,8 +306,8 @@ def process_test_plan(test_plan_uuid):
                             ['augmented_descriptors'][error_params[0]]['test_status']) = 'ERROR'
                         (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
                             [error_params[0]]['error']) = f'PA: {error_params[1]}'
-                        _LOG.error(f'Error processed for {test_plan_uuid}')
                         err_msg = context['test_preparations'][test_plan_uuid]['augmented_descriptors'][error_params[0]]['error']
+                        _LOG.error(f'Error processed for {test_plan_uuid}: {err_msg}')
                         # Prepare callback to planner
 
                 (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
@@ -584,7 +601,7 @@ def process_test_plan(test_plan_uuid):
         else:
             _LOG.warning(f"Platform {nsd_target} is not compatible")
 
-    else:
+    elif not err_msg:
         err_msg = f'Wrong platform value, should be a list and is a {type(platforms)}'
         _LOG.error(err_msg)
         try:
@@ -638,6 +655,15 @@ def process_test_plan(test_plan_uuid):
                                   status='ERROR',
                                   exception=err_msg)
             return
+
+    elif context['test_preparations'][test_plan_uuid] and err_msg:
+        _LOG.error('Triggering unknown failure process')
+        callback_path = [
+            d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
+            if d['status'] == 'COMPLETED'
+        ][0]
+        planner.send_callback(callback_path, test_plan_uuid, result_list=[], status='ERROR', exception=err_msg)
+        return
 
     elif all([
         test['test_status'] == 'COMPLETED'
