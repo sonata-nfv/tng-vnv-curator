@@ -272,7 +272,7 @@ def process_test_plan(test_plan_uuid):
                         (context['test_preparations'][test_plan_uuid]
                             ['augmented_descriptors'][error_params[0]]['test_status']) = 'ERROR'
                         (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-                            [error_params[0]]['error']) = f'PA: {error_params[1]["error"]}'
+                            [error_params[0]]['error']) = f'PA: {error_params[1].get("error")}'
                         err_msg = context['test_preparations'][test_plan_uuid]['augmented_descriptors'][error_params[0]]['error']
                         _LOG.error(f'Error processed for {test_plan_uuid}: {err_msg}')
                         # Prepare callback to planner
@@ -427,9 +427,8 @@ def process_test_plan(test_plan_uuid):
                         (context['test_preparations'][test_plan_uuid]
                             ['augmented_descriptors'][error_params[0]]['test_status']) = 'ERROR'
                         (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
-                            [error_params[0]]['error']) = f'PA: {error_params[1]}'
-                        err_msg = \
-                        context['test_preparations'][test_plan_uuid]['augmented_descriptors'][error_params[0]]['error']
+                            [error_params[0]]['error']) = f'PA: {error_params[1].get("error")}'
+                        err_msg = context['test_preparations'][test_plan_uuid]['augmented_descriptors'][error_params[0]]['error']
                         # Prepare callback to planner
                 else:
                     (context['test_preparations'][test_plan_uuid]['augmented_descriptors']
