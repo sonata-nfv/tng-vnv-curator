@@ -41,6 +41,7 @@ from curator.interfaces.common_databases_interface import CatalogueInterface
 from curator.interfaces.docker_interface import DockerInterface
 from curator.helpers import process_test_plan, cancel_test_plan, clean_environment
 import time
+from curator.util import convert_to_dict
 from curator.logger import TangoLogger
 import traceback
 
@@ -126,7 +127,8 @@ def handle_new_test_plan():
     """
     if request.method == 'GET':
         return make_response(
-            json.dumps({k: str(context['test_preparations'][k]) for k in context['test_preparations'].keys()}),
+            # json.dumps({k: str(context['test_preparations'][k]) for k in context['test_preparations'].keys()}),
+            json.dumps(context['test_preparations'], default=convert_to_dict, sort_keys=True),
             OK,
             {'Content-Type': 'application/json'}
         )
