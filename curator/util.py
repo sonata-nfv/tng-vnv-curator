@@ -55,7 +55,7 @@ class CustomEncoder(json.JSONEncoder):
     def default(self, obj):
         if hasattr(obj, '__json__'):
             _LOG.debug('deserialized: {}'.format(obj.__json__()))
-            return obj.__json__
+            return obj.__json__()
         elif isinstance(obj, datetime.datetime):
             return str(obj)
         else:
