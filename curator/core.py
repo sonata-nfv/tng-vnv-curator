@@ -128,7 +128,7 @@ def handle_new_test_plan():
     if request.method == 'GET':
         return make_response(
             # json.dumps({k: str(context['test_preparations'][k]) for k in context['test_preparations'].keys()}),
-            json.dumps(context['test_preparations'], default=convert_to_dict, sort_keys=True),
+            json.dumps(context['test_preparations'], default=convert_to_dict),
             OK,
             {'Content-Type': 'application/json'}
         )
