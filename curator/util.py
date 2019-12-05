@@ -25,19 +25,39 @@
 # acknowledge the contributions of their colleagues of the 5GTANGO
 # partner consortium (www.5gtango.eu).
 
+import logging
+from curator.logger import TangoLogger
+import json
+import datetime
 
-class Interface:
+_LOG = TangoLogger.getLogger('curator:util', log_level=logging.DEBUG, log_json=True)
+
+
+def convert_to_dict(o):
     """
-    Interface Abstraction WIP
+    A function takes in a custom object and returns a dictionary representation of the object.
+    This dict representation includes meta data such as the object's module and class names.
     """
-    def __init__(self, own_api_root=None, own_api_version=None):
-        self.__base_url = ''
-        self.ledger = []
-        self.own_api_root = own_api_root
-        self.own_api_version = own_api_version
 
-    def __str__(self):
-        return self.__class__.__name__
+    #  Populate the dictionary with object meta data
+    obj_dict = {
+        "__class__": o.__class__.__name__,
+        # "__module__": obj.__module__
+    }
 
-    def __json__(self):
-        return self.__class__.__name__
+    #  Populate the dictionary with object properties
+    obj_dict.update(o.__dict__)
+    _LOG.debug('deserialized: {}'.format(obj_dict))
+    return obj_dict
+
+
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj, '__json__'):
+            _LOG.debug('deserialized: {}'.format(obj.__json__()))
+            return obj.__json__()
+        elif isinstance(obj, datetime.datetime):
+            return str(obj)
+        else:
+            return json.JSONEncoder.default(self, obj)
+

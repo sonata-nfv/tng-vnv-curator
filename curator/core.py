@@ -41,6 +41,7 @@ from curator.interfaces.common_databases_interface import CatalogueInterface
 from curator.interfaces.docker_interface import DockerInterface
 from curator.helpers import process_test_plan, cancel_test_plan, clean_environment
 import time
+from curator.util import CustomEncoder
 from curator.logger import TangoLogger
 import traceback
 
@@ -125,8 +126,14 @@ def handle_new_test_plan():
     :return:
     """
     if request.method == 'GET':
+        response_list = [context['test_preparations'][testplan] for testplan in context['test_preparations'].keys()]
+        for testplan in response_list:
+            if 'docker_interface' in testplan.keys():
+                testplan['docker_interface'] = str(testplan['docker_interface'])
         return make_response(
-            json.dumps(context['test_preparations']),
+            # json.dumps({k: str(context['test_preparations'][k]) for k in context['test_preparations'].keys()}),
+            # json.dumps(context['test_preparations'], cls=CustomEncoder),
+            json.dumps(response_list),
             OK,
             {'Content-Type': 'application/json'}
         )
@@ -134,7 +141,7 @@ def handle_new_test_plan():
         # app.logger.debug(f'New test plan received, contains {request.get_data()}, '
         #                  f'Content-type: {request.headers["Content-type"]}')
         _LOG.debug(f'New test plan received, contains {request.get_data()}, '
-                         f'Content-type: {request.headers["Content-type"]}')
+                   f'Content-type: {request.headers["Content-type"]}')
         if request.headers["Content-type"].split(';')[0] != 'application/json':
             return make_response(json.dumps({'exception': 'A valid JSON payload is required', 'status': 'ERROR'}), NOT_ACCEPTABLE,
                                  {'Content-Type': 'application/json'})
