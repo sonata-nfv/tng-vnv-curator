@@ -39,6 +39,6 @@ def convert_to_dict(obj):
     }
 
     #  Populate the dictionary with object properties
-    obj_dict.update(obj.__dict__)
+    # obj_dict.update(obj.__dict__)
 
     return obj_dict
