@@ -28,6 +28,7 @@
 import logging
 from curator.logger import TangoLogger
 import json
+import datetime
 
 _LOG = TangoLogger.getLogger('curator:util', log_level=logging.DEBUG, log_json=True)
 
@@ -55,6 +56,8 @@ class CustomEncoder(json.JSONEncoder):
         if hasattr(obj, '__json__'):
             _LOG.debug('deserialized: {}'.format(obj.__json__()))
             return obj.__json__
+        elif isinstance(obj, datetime.datetime):
+            return str(obj)
         else:
             return json.JSONEncoder.default(self, obj)
 
