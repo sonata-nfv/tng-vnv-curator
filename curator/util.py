@@ -27,6 +27,7 @@
 
 import logging
 from curator.logger import TangoLogger
+import json
 
 _LOG = TangoLogger.getLogger('curator:util', log_level=logging.DEBUG, log_json=True)
 
@@ -47,3 +48,13 @@ def convert_to_dict(o):
     obj_dict.update(o.__dict__)
     _LOG.debug('deserialized: {}'.format(obj_dict))
     return obj_dict
+
+
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj, '__json__'):
+            _LOG.debug('deserialized: {}'.format(obj.__json__()))
+            return obj.__json__
+        else:
+            return json.JSONEncoder.default(self, obj)
+

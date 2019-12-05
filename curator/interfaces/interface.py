@@ -38,3 +38,6 @@ class Interface:
 
     def __str__(self):
         return self.__class__
+
+    def __json__(self):
+        return self.__class__.__name__
