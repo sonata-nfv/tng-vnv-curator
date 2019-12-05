@@ -25,6 +25,11 @@
 # acknowledge the contributions of their colleagues of the 5GTANGO
 # partner consortium (www.5gtango.eu).
 
+import logging
+from curator.logger import TangoLogger
+
+_LOG = TangoLogger.getLogger('curator:util', log_level=logging.DEBUG, log_json=True)
+
 
 def convert_to_dict(o):
     """
@@ -40,5 +45,5 @@ def convert_to_dict(o):
 
     #  Populate the dictionary with object properties
     obj_dict.update(o.__dict__)
-
+    _LOG.debug('deserialized: {}'.format(obj_dict))
     return obj_dict
