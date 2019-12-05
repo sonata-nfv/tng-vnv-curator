@@ -126,7 +126,7 @@ def handle_new_test_plan():
     :return:
     """
     if request.method == 'GET':
-        response_list = [context['test_preparations'][testplan].update({'uuid': testplan}) for testplan in context['test_preparations'].keys()]
+        response_list = [context['test_preparations'][testplan] for testplan in context['test_preparations'].keys()]
         for testplan in response_list:
             if 'docker_interface' in testplan.keys():
                 testplan['docker_interface'] = str(testplan['docker_interface'])
