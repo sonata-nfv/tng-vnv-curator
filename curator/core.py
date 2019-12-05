@@ -126,7 +126,7 @@ def handle_new_test_plan():
     """
     if request.method == 'GET':
         return make_response(
-            json.dumps(context['test_preparations']),
+            json.dumps({k: str(context['test_preparations'][k]) for k in context['test_preparations'].keys()}),
             OK,
             {'Content-Type': 'application/json'}
         )
@@ -134,7 +134,7 @@ def handle_new_test_plan():
         # app.logger.debug(f'New test plan received, contains {request.get_data()}, '
         #                  f'Content-type: {request.headers["Content-type"]}')
         _LOG.debug(f'New test plan received, contains {request.get_data()}, '
-                         f'Content-type: {request.headers["Content-type"]}')
+                   f'Content-type: {request.headers["Content-type"]}')
         if request.headers["Content-type"].split(';')[0] != 'application/json':
             return make_response(json.dumps({'exception': 'A valid JSON payload is required', 'status': 'ERROR'}), NOT_ACCEPTABLE,
                                  {'Content-Type': 'application/json'})

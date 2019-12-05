@@ -604,7 +604,7 @@ def process_test_plan(test_plan_uuid):
             d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
             if d['status'] == 'COMPLETED'
         ][0]
-        results = [test.get('test_results') for test in context['test_preparations'][test_plan_uuid]]
+        results = [context['test_preparations'][test].get('test_results') for test in context['test_preparations'][test_plan_uuid]]
         planner.send_callback(callback_path, test_plan_uuid, result_list=results, status='ERROR')
         return
     # LOG.debug('completed ' + test_plan)
