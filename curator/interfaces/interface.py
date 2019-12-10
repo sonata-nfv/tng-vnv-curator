@@ -40,4 +40,7 @@ class Interface:
         return self.__class__.__name__
 
     def __json__(self):
-        return self.__class__.__name__
+        return {
+            'Interface': self.__class__.__name__,
+            'api': '/'.join([self.__base_url, self.own_api_root, self.own_api_version])
+        }

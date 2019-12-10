@@ -97,8 +97,19 @@ class DockerInterface(Interface):
             _LOG.error(f'Image {image_name} has been not found')
             return None
 
-    def prune(self):
-        pass
+    def image_prune(self):
+        try:
+            pruned = self.docker_manager.images.prune()
+            return pruned
+        except docker.errors.APIError as e:
+            raise e
+
+    def network_prune(self):
+        try:
+            pruned = self.docker_manager.networks.prune()
+            return pruned
+        except docker.errors.APIError as e:
+            raise e
 
     def pull(self, image_name, retry_max=3):
 

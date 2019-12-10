@@ -600,6 +600,7 @@ def process_test_plan(test_plan_uuid):
     else:
         # Shouldn't reach here, check why it did
         _LOG.error(f'Should not reach this point, check why app did it. Test_plan: #{test_plan_uuid}')
+        _LOG.debug(f'var_trace:{vars()}')
         callback_path = [
             d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
             if d['status'] == 'COMPLETED'
