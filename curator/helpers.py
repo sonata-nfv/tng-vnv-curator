@@ -670,7 +670,14 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
                 if not probe['id'].startswith('aa-bb-cc-dd'):
                     dockeri.rm_image(probe['image'])
             except Exception as e:
-                _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
+                tb = "".join(traceback.format_exc().split("\n"))
+                _LOG.error(f'Failed removal of {probe["name"]}, reason: {e}, traceback: {tb}')
+        try:
+            # Do network prune
+            dockeri.network_prune()
+        except Exception as e:
+            tb = "".join(traceback.format_exc().split("\n"))
+            _LOG.error(f'Failed removal of {probe["name"]}, reason: {e}, traceback: {tb}')
 
         #  Answer to planner
         try:
