@@ -600,6 +600,7 @@ def process_test_plan(test_plan_uuid):
     else:
         # Shouldn't reach here, check why it did
         _LOG.error(f'Should not reach this point, check why app did it. Test_plan: #{test_plan_uuid}')
+        _LOG.debug(f'var_trace:{vars()}')
         callback_path = [
             d['url'] for d in context['test_preparations'][test_plan_uuid]['test_plan_callbacks']
             if d['status'] == 'COMPLETED'
@@ -669,7 +670,14 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
                 if not probe['id'].startswith('aa-bb-cc-dd'):
                     dockeri.rm_image(probe['image'])
             except Exception as e:
-                _LOG.exception(f'Failed removal of {probe["name"]}, reason: {e}')
+                tb = "".join(traceback.format_exc().split("\n"))
+                _LOG.error(f'Failed removal of {probe["name"]}, reason: {e}, traceback: {tb}')
+        try:
+            # Do network prune
+            dockeri.network_prune()
+        except Exception as e:
+            tb = "".join(traceback.format_exc().split("\n"))
+            _LOG.error(f'Failed removal of {probe["name"]}, reason: {e}, traceback: {tb}')
 
         #  Answer to planner
         try:
