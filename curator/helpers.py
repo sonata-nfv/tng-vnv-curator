@@ -694,7 +694,7 @@ def clean_environment(test_plan_uuid, test_id=None, content=None, error=None):
             else:
                 final_status = 'ERROR'
             _LOG.debug(f'results for test_plan #{test_plan_uuid}: {res_list}')
-            planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status=final_status)
+            planner_resp = planner.send_callback(callback_path, test_plan_uuid, res_list, status=final_status, exception=error)
             _LOG.debug(f'Response from planner: {planner_resp}')
             # if planner_resp ok, clean test_preparations entry
             if remote_docker_interface:
