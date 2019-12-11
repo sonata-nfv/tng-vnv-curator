@@ -395,9 +395,10 @@ def test_cancelled(test_plan_uuid, test_uuid):
                 _LOG.warning(f'Test {test_uuid} appears to be cancelled or non-existent')
         else:
             # app.logger.debug(f'Executor reported some error while cancelling test #{test_uuid}')
-            _LOG.debug(f'Executor reported some error while executing or cancelling test #{test_uuid}')
+            _LOG.debug(f'Executor reported some error while executing or cancelling test #{test_uuid}, status={payload.get("status")}')
             context['test_preparations'][test_plan_uuid]['updated_at'] = datetime.utcnow().replace(microsecond=0)
-            if test_uuid not in [result_entry['test_uuid'] for result_entry in context['test_preparations'][test_plan_uuid]['test_results']]:
+            if test_uuid not in [result_entry['test_uuid']
+                                 for result_entry in context['test_preparations'][test_plan_uuid]['test_results']]:
                 context['test_preparations'][test_plan_uuid]['test_results'].append(payload)
             else:
                 for idx, item in enumerate(context['test_preparations'][test_plan_uuid]['test_results']):
@@ -411,7 +412,12 @@ def test_cancelled(test_plan_uuid, test_uuid):
                 # app.logger.warning(f'Test {test_uuid} appears to be canceled or non-existent, or test failed')
                 _LOG.warning(f'Test {test_uuid} execution failed, or appears to be cancelled or non-existent. '
                              f'Cleaning environment.')
-            process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, request.get_json(),))
+            if payload['status'] == 'ERROR':
+                error = payload.get('message')
+            else:
+                error = None
+
+            process_thread = Thread(target=clean_environment, args=(test_plan_uuid, test_uuid, payload, error))
             process_thread.start()
             context['threads'].append(process_thread)
     except Exception as e:
